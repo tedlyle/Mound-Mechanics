@@ -7,6 +7,7 @@ A browser tool for coaches. Upload a pitching video and it:
 - checks balance, glove position, arm timing, stride, finish and direction
 - suggests drills for each issue
 - exports an annotated MP4 with slow motion, freeze-frame callouts and a summary card
+- combines every angle of the same pitcher (same pitcher name) into one report, one practice plan and one all-angles video
 
 Videos never leave the device. Nothing is uploaded or stored.
 
