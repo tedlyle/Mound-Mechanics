@@ -855,6 +855,30 @@ function analyzePitch(c) {
         : "At foot strike the throwing elbow is lifted well above the shoulder line. That arm path is linked to extra stress on young shoulders and elbows, so it's worth cleaning up early.",
       drills: st === "good" ? [] : ["footballThrows", "powerPos"], ann: [{ t: "elbowLine", col: st }], hl: st === "good" ? [] : [[Tt.sh, Tt.el]] });
   }
+  // 12b. throwing-elbow bend at foot strike (side view). Textbook is about 90°; a nearly straight arm means a long, late arm path
+  c.relH = null; c.relExt = null;
+  if (view === "side") {
+    const fr = [fs, Math.min(T - 1, fs + F30(1))];
+    const bend = fr.reduce((t, i) => t + ang3(K[i][Tt.sh], K[i][Tt.el], K[i][Tt.wr]), 0) / fr.length;
+    const bad = bend > 135 ? (bend - 135) / 12.5 + 1 : bend < 55 ? (55 - bend) / 15 + 1 : 0;
+    const [st, ex] = st3(bad, 1, 3, 4);
+    F.push({ id: "elbowFlex", frame: fs, moment: "Foot strike", status: st, extreme: ex,
+      title: st === "good" ? "Throwing arm bent and ready at foot strike" : bend > 135 ? "Throwing arm still straight at foot strike" : "Throwing elbow very tight at foot strike",
+      meas: `Elbow bend ${bend.toFixed(0)}° (about 90° is typical)`,
+      body: st === "good" ? "The throwing elbow is bent close to a right angle as the front foot lands, which sets up a short, efficient arm path."
+        : bend > 135 ? "When the front foot lands the throwing arm is still nearly straight, reaching back. A long arm path like this usually means the arm is late and has to whip through to catch up, which costs control and adds stress."
+        : "The throwing elbow is folded very tight at foot strike. That usually comes from short-arming the ball and can cut off arm speed.",
+      drills: st === "good" ? [] : bend > 135 ? ["powerPos", "handBreak"] : ["handBreak", "footballThrows"],
+      ann: [{ t: "joint", a: Tt.sh, b: Tt.el, c: Tt.wr, text: "throwing elbow", col: st }], hl: st === "good" ? [] : [[Tt.sh, Tt.el], [Tt.el, Tt.wr]] });
+    // release point (note): hand height above the ground and how far out in front of the rubber, both as a share of his height
+    const ground = Math.max(K[rel][15][1], K[rel][16][1]);
+    const relH = (ground - K[rel][Tt.wr][1]) / height, relExt = ((K[rel][Tt.wr][0] - K[fs][Tt.an][0]) * dir) / height;
+    c.relH = relH; c.relExt = relExt;
+    F.push({ id: "release", frame: rel, moment: "Release", status: "good", info: true,
+      title: "Release point", meas: `Hand ${Math.round(relH * 100)}% of his height off the ground · ${Math.round(relExt * 100)}% of his height in front of the rubber`,
+      body: "For reference. A pitcher who repeats his release point repeats his location. Upload several pitches from the same side angle and the combined report compares them. Filming at 60 fps makes this more precise.",
+      drills: [], ann: [{ t: "release", col: "#8fbaff" }] });
+  }
   // 13. arm slot at release (behind or front view; informational)
   if (view !== "side") {
     const sh = K[rel][Tt.sh], wr = K[rel][Tt.wr];
@@ -1227,6 +1251,11 @@ function drawAnn(ctx, c, f, kp, u) {
       const angle = Math.acos(Math.max(-1, Math.min(1, (d1[0] * d2[0] + d1[1] * d2[1]) / (Math.hypot(...d1) * Math.hypot(...d2) || 1)))) * 180 / Math.PI;
       ctx.lineWidth = 4 * u; ctx.beginPath(); ctx.arc(p2[0], p2[1], R * 0.8, 0, 7); ctx.stroke();
       label(ctx, `${a.text} ${angle.toFixed(0)}°`, p2[0] + (dir > 0 ? 1 : -1) * (R + 14 * u), p2[1], col, u, dir > 0 ? "left" : "right");
+    } else if (a.t === "release") {
+      const wr = kp[S.t.wr], gy = Math.max(kp[15][1], kp[16][1]);
+      ctx.strokeStyle = "#8fbaff"; ctx.lineWidth = 6 * u; ctx.beginPath(); ctx.arc(wr[0], wr[1], R * 0.7, 0, 7); ctx.stroke();
+      ctx.lineWidth = 3 * u; ctx.setLineDash([9 * u, 8 * u]); ctx.beginPath(); ctx.moveTo(wr[0], wr[1] + R * 0.7); ctx.lineTo(wr[0], gy); ctx.stroke(); ctx.setLineDash([]);
+      label(ctx, "release point", wr[0] + (dir > 0 ? 1 : -1) * (R + 12 * u), wr[1], "#8fbaff", u, dir > 0 ? "left" : "right");
     } else if (a.t === "balanceLine") {
       const fa = kp[S.g.an], ba = kp[S.t.an], hd = kp[0];
       const gy = Math.max(fa[1], ba[1]) + 18 * u;
@@ -1639,12 +1668,13 @@ async function analyzeGroup(g, st) {
 const CHECKS = {
   gloveFS: { name: "Glove at foot strike", need: "any" }, gloveFin: { name: "Glove after release", need: "any" },
   falloff: { name: "Direction to the plate", need: "behind" }, finish: { name: "Finish over the front leg", need: "side" },
-  elbow: { name: "Elbow height at foot strike", need: "any" }, kneeBrace: { name: "Front knee at release", need: "side" },
+  elbow: { name: "Elbow height at foot strike", need: "any" }, elbowFlex: { name: "Elbow bend at foot strike", need: "side" },
+  kneeBrace: { name: "Front knee at release", need: "side" },
   strideDir: { name: "Stride direction", need: "behind" }, stride: { name: "Stride length", need: "side" },
   armUp: { name: "Arm timing at foot strike", need: "side" }, trunkRel: { name: "Posture at release", need: "any" },
   drift: { name: "Early drift", need: "side" }, head: { name: "Head stability", need: "any" },
   tempo: { name: "Tempo", need: "any" }, balance: { name: "Balance at the top", need: "any" },
-  slot: { name: "Arm slot", need: "behind" }
+  slot: { name: "Arm slot", need: "behind" }, release: { name: "Release point", need: "side" }
 };
 const SCHECKS = {
   sHead: { name: "Head movement", need: "any" }, sHands: { name: "Hand path before the swing", need: "any" },
@@ -1673,11 +1703,11 @@ function combine(g) {
     if (ev.length < 2) return;
     const vs = ev.map((x) => vals(x.c)), lo = Math.min(...vs), hi = Math.max(...vs), spread = hi - lo;
     const st = spread > limit * 1.8 ? "fix" : spread > limit ? "watch" : "good";
-    const worst = { id: "cons_" + id, status: st, level: st === "watch" ? "light" : st === "fix" ? "standard" : null, drills: st === "good" ? [] : drills,
+    const worst = { id: "cons_" + id + "_" + label, status: st, level: st === "watch" ? "light" : st === "fix" ? "standard" : null, drills: st === "good" ? [] : drills,
       title: st === "good" ? `${label} is consistent across clips` : `${label} changes from clip to clip`,
       body: st === "good" ? `${label} stays within ${fmtV(spread)}${unit} across these clips, a sign the delivery is repeating.`
         : `${label} ranges from ${fmtV(lo)}${unit} to ${fmtV(hi)}${unit} across these clips. A delivery that changes pitch to pitch is hard to command. Work on repeating one version of it.` };
-    cons.push({ id: "cons_" + id, name: label + " consistency", ev, worst, status: st, score: RANK[st], flaggedIn: st === "good" ? [] : ev.map((x) => ({ c: x.c, f: { ...x.f, drills, level: worst.level } })) });
+    cons.push({ id: "cons_" + id + "_" + label, name: label + " consistency", ev, worst, status: st, score: RANK[st], flaggedIn: st === "good" ? [] : ev.map((x) => ({ c: x.c, f: { ...x.f, drills, level: worst.level } })) });
   };
   if (g.kind === "swing") {
     addCons("sStride", "Stride length", (c) => c.strideR != null ? c.strideR * 100 : null, "% of height", (v) => v.toFixed(0), 8, ["hStrideHold", "hRepeat"], "side");
@@ -1687,6 +1717,8 @@ function combine(g) {
     addCons("stride", "Stride length", (c) => c.strideR != null ? c.strideR * 100 : null, "% of height", (v) => v.toFixed(0), 8, ["strideTape", "boxLanding"], "side");
     addCons("tempo", "Tempo", (c) => c.tempo, " s", (v) => v.toFixed(2), 0.15, ["rhythmCount"], null);
     addCons("slot", "Arm slot", (c) => c.slot, "°", (v) => v.toFixed(0), 12, ["slotRepeat"], "behind");
+    addCons("release", "Release height", (c) => c.relH != null ? c.relH * 100 : null, "% of height", (v) => v.toFixed(0), 8, ["slotRepeat", "rhythmCount"], "side");
+    addCons("release", "Release extension", (c) => c.relExt != null ? c.relExt * 100 : null, "% of height", (v) => v.toFixed(0), 8, ["towel", "chestOverKnee"], "side");
   }
   checks.push(...cons); checks.sort((a, b) => RANK[b.status] - RANK[a.status] || b.score - a.score);
   const flagged = checks.filter((e) => e.status !== "good"), keep = checks.filter((e) => e.status === "good" && !e.worst.info);
