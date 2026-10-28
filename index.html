@@ -105,7 +105,8 @@ header.top { display: flex; flex-wrap: wrap; align-items: flex-end; justify-cont
 .tally { display: flex; gap: 6px; flex-wrap: wrap }
 .pill { font: 700 .74rem var(--f-display); letter-spacing: .08em; text-transform: uppercase; padding: 3px 9px; border-radius: 999px }
 .pill.fix { background: var(--fix-bg); color: var(--fix) } .pill.watch { background: var(--watch-bg); color: var(--watch) } .pill.good { background: var(--good-bg); color: var(--good) }
-.moments { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; margin: 14px 0 }
+.moments { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; margin: 6px 0 4px }
+#momentsBox { margin-top: 10px }
 @media (max-width: 520px) { .moments { grid-template-columns: repeat(2, minmax(0, 1fr)) } }
 .chip { border: 1px solid var(--line); border-radius: 10px; padding: 8px; display: grid; gap: 2px; background: var(--surface-2); cursor: pointer; text-align: left; color: var(--ink); font: inherit }
 .chip .k { font: 700 .7rem var(--f-display); letter-spacing: .08em; text-transform: uppercase; color: var(--muted) }
@@ -161,7 +162,33 @@ details.clipSettings > summary::after { content: "+"; font: 600 1.2rem var(--f-b
 details.clipSettings[open] > summary::after { content: "–" }
 .primaryActions { margin-top: 12px; display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 10px; align-items: end }
 .primaryActions .btn { min-height: 42px }
+/* history + save */
+.savePanel { margin-top: 16px; border-top: 1px solid var(--line); padding-top: 12px; display: grid; gap: 8px }
+.saveRow { display: flex; gap: 10px; align-items: end; flex-wrap: wrap }
+.saveRow input[type=date] { min-height: 40px; font: inherit; color: var(--ink); background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 6px 10px }
+.saveRow .btn { min-height: 40px }
+.histActions { margin-top: 10px; display: flex; gap: 8px; flex-wrap: wrap }
+details.player { border-top: 1px solid var(--line); padding: 10px 0 }
+details.player > summary { cursor: pointer; list-style: none; display: flex; justify-content: space-between; align-items: baseline; gap: 10px; padding: 4px 0 }
+details.player > summary::-webkit-details-marker { display: none }
+.pname { font: 700 1.1rem var(--f-display) }
+details.player .meta { font-size: .82rem; color: var(--muted) }
+.pk { margin-top: 10px }
+.trendWrap { overflow-x: auto; -webkit-overflow-scrolling: touch; border: 1px solid var(--line); border-radius: 12px }
+table.trend { border-collapse: collapse; width: 100%; font-size: .84rem }
+table.trend th, table.trend td { padding: 6px 8px; border-bottom: 1px solid var(--line); text-align: center; white-space: nowrap }
+table.trend th:first-child, table.trend td:first-child { text-align: left; white-space: normal; min-width: 130px; position: sticky; left: 0; background: var(--surface) }
+table.trend thead th { font: 700 .72rem var(--f-display); letter-spacing: .08em; text-transform: uppercase; color: var(--muted) }
+table.trend tr:last-child td { border-bottom: 0 }
+table.trend .na { color: var(--muted) }
+.sess { border: 1px solid var(--line); border-radius: 12px; padding: 10px 12px; margin-top: 8px; display: grid; gap: 8px; background: var(--surface) }
+.sessHead { display: flex; justify-content: space-between; align-items: center; gap: 8px; flex-wrap: wrap }
+.sessHead .tally { display: inline-flex; gap: 4px; flex-wrap: wrap }
+.sessClips { display: flex; gap: 6px; flex-wrap: wrap }
+.sessActions { display: flex; gap: 8px }
+#histOpenBtn[aria-pressed="true"] { border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent) inset }
 .appTitle, .tabbar { display: none }
+
 nav.clips { display: flex; gap: 8px; flex-wrap: wrap; align-items: center }
 .addRow { display: inline-flex; gap: 8px; flex-wrap: wrap }
 
@@ -181,6 +208,12 @@ nav.clips { display: flex; gap: 8px; flex-wrap: wrap; align-items: center }
   /* screens */
   body:not([data-m="home"]) nav.clips, body:not([data-m="home"]) .tips, body[data-n="0"] nav.clips { display: none }
   body[data-m="home"] #workbench, body[data-m="home"] #combined { display: none !important }
+  body:not([data-m="history"]) #history { display: none !important }
+  .deskOnly { display: none }
+  .histOpen { display: none }
+  body[data-m="history"] #workbench, body[data-m="history"] #combined, body[data-m="history"] #empty { display: none !important }
+  .sessActions .btn { flex: 1; justify-content: center; min-height: 44px; border-radius: 12px }
+  .saveRow .btn { flex: 1; justify-content: center; min-height: 46px; border-radius: 12px }
   body[data-m="video"] #report, body[data-m="report"] #stageCard { display: none }
   .grid { gap: 0 }
 
@@ -227,7 +260,7 @@ nav.clips { display: flex; gap: 8px; flex-wrap: wrap; align-items: center }
   #report > #reportBody > .actions .btn, .combo .actions .btn { justify-content: center; min-height: 46px; border-radius: 12px; font-size: .9rem }
 
   /* bottom tab bar */
-  .tabbar { display: grid; grid-template-columns: repeat(4, 1fr); position: fixed; left: 0; right: 0; bottom: 0; z-index: 40;
+  .tabbar { display: grid; grid-template-columns: repeat(5, 1fr); position: fixed; left: 0; right: 0; bottom: 0; z-index: 40;
     padding: 6px max(8px, env(safe-area-inset-left, 0px)) calc(6px + env(safe-area-inset-bottom, 0px));
     background: color-mix(in srgb, var(--surface) 90%, transparent); -webkit-backdrop-filter: saturate(1.6) blur(16px); backdrop-filter: saturate(1.6) blur(16px);
     border-top: 1px solid var(--line) }
@@ -269,6 +302,7 @@ nav.clips { display: flex; gap: 8px; flex-wrap: wrap; align-items: center }
       <label class="btn primary" for="fileIn">Add pitching videos</label>
       <label class="btn primary" for="fileInBat">Add batting videos</label>
     </span>
+    <button class="btn histOpen" id="histOpenBtn" type="button">History</button>
     <input id="fileIn" type="file" accept="video/*,.mov,.mp4,.m4v,.webm" multiple hidden>
     <input id="fileInBat" type="file" accept="video/*,.mov,.mp4,.m4v,.webm" multiple hidden>
   </nav>
@@ -285,7 +319,7 @@ nav.clips { display: flex; gap: 8px; flex-wrap: wrap; align-items: center }
         <li>Pitching: a side view (1st- or 3rd-base side) measures the most. A view from behind shows direction to the plate.</li>
         <li>Batting: a side view facing the hitter measures the most. A view from the pitcher or catcher shows whether the head pulls off.</li>
       </ul>
-      <div class="actions"><label class="btn primary" for="fileIn">Upload pitching videos</label><label class="btn primary" for="fileInBat">Upload batting videos</label></div>
+      <div class="actions"><label class="btn primary" for="fileIn">Upload pitching videos</label><label class="btn primary" for="fileInBat">Upload batting videos</label><button class="btn" type="button" id="emptyHistBtn">Open saved history</button></div>
     </div>
     <svg viewBox="0 0 260 300" role="img" aria-label="Example of the overlay: a stick figure at foot strike with the glove circled and the stride measured">
       <rect x="0" y="0" width="260" height="300" rx="14" fill="var(--stage)"/>
@@ -323,6 +357,10 @@ nav.clips { display: flex; gap: 8px; flex-wrap: wrap; align-items: center }
         <span class="time" id="timeLbl">0.00 s</span>
       </div>
       <div class="markers" id="markers" aria-hidden="true"></div>
+      <div id="momentsBox" hidden>
+        <p class="eyebrow">Key moments · tap to view · tap or hold ◀ ▶ to adjust</p>
+        <div class="moments" id="moments"></div>
+      </div>
       <div class="transport">
         <label class="toggle"><input type="checkbox" id="slowChk"> Slow motion (¼ speed)</label>
         <label class="toggle"><input type="checkbox" id="skelChk" checked> Body outline</label>
@@ -360,11 +398,26 @@ nav.clips { display: flex; gap: 8px; flex-wrap: wrap; align-items: center }
 
   <section id="combined" hidden aria-label="Combined report for all clips"></section>
 
+  <section id="history" hidden aria-label="Saved history">
+    <div class="card">
+      <div class="reportHead"><h2>History</h2><span class="note" id="histUsage" style="margin:0"></span><button class="btn deskOnly" id="histCloseBtn" type="button">Close</button></div>
+      <p class="note" style="margin-top:6px">Saved on this device only. On iPhone, add Mound Check to your Home Screen so Safari doesn't clear it, and download a backup now and then.</p>
+      <div class="actions histActions">
+        <button class="btn" id="backupBtn" type="button">Download backup</button>
+        <label class="btn" for="restoreIn">Restore backup</label>
+        <input id="restoreIn" type="file" accept=".json,application/json" hidden>
+      </div>
+      <p class="status" id="histStatus" role="status"></p>
+      <div id="histBody"></div>
+    </div>
+  </section>
+
   <nav class="tabbar" id="tabbar" aria-label="Screens" hidden>
     <button type="button" data-m="home"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h16v2H4zm0 5h16v2H4zm0 5h10v2H4z"/></svg><span>Clips</span></button>
     <button type="button" data-m="video"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5h12a2 2 0 0 1 2 2v2.5l4-3v11l-4-3V17a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2z"/></svg><span>Video</span></button>
     <button type="button" data-m="report"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 2h6a1 1 0 0 1 1 1v1h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2V3a1 1 0 0 1 1-1zm1 2v2h4V4zM7 10v2h10v-2zm0 4v2h7v-2z"/></svg><span>Report</span><i class="badge" id="repBadge" hidden></i></button>
     <button type="button" data-m="all"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2 2 7l10 5 10-5zm-8.6 9L2 11.7 12 17l10-5.3-1.4-.7L12 15.4zm0 5L2 16.7 12 22l10-5.3-1.4-.7L12 20.4z"/></svg><span>Team plan</span></button>
+    <button type="button" data-m="history"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M13 3a9 9 0 0 0-9 9H1l4 4 4-4H6a7 7 0 1 1 2.05 4.95l-1.42 1.42A9 9 0 1 0 13 3zm-1 5v5l4.25 2.52.77-1.28L13.5 12.2V8z"/></svg><span>History</span></button>
   </nav>
 
   <section class="tips" aria-label="Filming tips">
@@ -1516,7 +1569,7 @@ function compose(ctx, c, W, H, idx, opts) {
   // fit the clip inside the frame (letterbox when a combined export mixes portrait and landscape clips)
   const k = Math.min(W / c.W, H / c.H), dw = c.W * k, dh = c.H * k, ox = (W - dw) / 2, oy = (H - dh) / 2;
   if (ox > 0.5 || oy > 0.5) { ctx.fillStyle = "#0b0f0d"; ctx.fillRect(0, 0, W, H) }
-  ctx.drawImage(video, ox, oy, dw, dh);
+  if (c.noVideo) { ctx.fillStyle = "#101713"; ctx.fillRect(ox, oy, dw, dh) } else ctx.drawImage(video, ox, oy, dw, dh);
   if (opts.dim) { ctx.fillStyle = `rgba(0,0,0,${opts.dim})`; ctx.fillRect(0, 0, W, H) }
   const kp = c.sm && c.sm[idx] ? c.sm[idx].map((p) => [p[0] * k + ox, p[1] * k + oy, p[2]]) : null;
   ctx.save();
@@ -1537,14 +1590,16 @@ function findingAt(c, idx) {
   if (c.focus && c.focus.frame === idx) return c.focus;
   return c.sorted.find((f) => f.frame === idx && f.status !== "good") || c.sorted.find((f) => f.frame === idx) || null;
 }
+const curT = (c) => c && c.noVideo ? (state.vt || 0) : video.currentTime;
+const durOf = (c) => c && c.noVideo ? (c.duration || 1) : (video.duration || 1);
 function renderStage() {
-  const c = clip(); if (!c || !video.videoWidth) return;
+  const c = clip(); if (!c || (!c.noVideo && !video.videoWidth)) return;
   const [W, H] = [stage.width, stage.height];
-  const idx = idxAt(c, video.currentTime);
+  const idx = idxAt(c, curT(c));
   const f = state.playing ? null : findingAt(c, idx);
   compose(sctx, c, W, H, idx, { skeleton: $("skelChk").checked && idx >= 0, finding: f, dim: f ? 0.18 : 0, banner: null, panel: !!f });
-  $("timeLbl").textContent = fmt(video.currentTime) + " s";
-  if (!scrubbing) $("scrub").value = Math.round((video.currentTime / (video.duration || 1)) * 1000);
+  $("timeLbl").textContent = fmt(curT(c)) + " s";
+  if (!scrubbing) $("scrub").value = Math.round((curT(c) / durOf(c)) * 1000);
 }
 let scrubbing = false;
 function loop() {
@@ -1553,13 +1608,17 @@ function loop() {
 }
 function setPlayIcon(on) { $("playIcon").setAttribute("d", on ? "M7 5h4v14H7zm6 0h4v14h-4z" : "M8 5v14l11-7z"); $("playBtn").setAttribute("aria-label", on ? "Pause" : "Play") }
 function stopPlay() { state.playing = false; video.pause(); cancelAnimationFrame(state.raf); setPlayIcon(false); renderStage() }
-async function showFrame(t) { stopPlay(); await seek(t); renderStage() }
+async function showFrame(t) {
+  stopPlay(); const c = clip();
+  if (c && c.noVideo) { state.vt = Math.max(0, Math.min(c.duration || 0, t)); renderStage(); return }
+  await seek(t); renderStage();
+}
 
 /* ---------------- phone layout: one screen at a time with a bottom tab bar ---------------- */
 const mq = window.matchMedia("(max-width: 760px)");
 const isMob = () => mq.matches;
 function setMode(m) {
-  if (!state.clips.length) m = "home";
+  if (!state.clips.length && m !== "history") m = "home";
   state.m = m; document.body.dataset.m = m;
   document.querySelectorAll("#tabbar button").forEach((b) => b.setAttribute("aria-current", b.dataset.m === m ? "page" : "false"));
   updateAppTitle();
@@ -1569,12 +1628,13 @@ function updateAppTitle() {
   const c = clip(), m = state.m || "home";
   document.body.dataset.n = state.clips.length;
   $("appTitle").textContent = m === "home" ? (state.clips.length ? `${state.clips.length} clip${state.clips.length === 1 ? "" : "s"}` : "")
-    : m === "all" ? "Team plan" : c ? `${c.label ? c.label + " · " : ""}${c.name}` : "";
+    : m === "all" ? "Team plan" : m === "history" ? "History" : c ? `${c.label ? c.label + " · " : ""}${c.name}` : "";
   const fixes = c && c.findings ? c.findings.filter((f) => f.status === "fix").length : 0;
   $("repBadge").hidden = !fixes; $("repBadge").textContent = fixes || "";
 }
 async function goScreen(m) {
   if (m === "all") { selectAll(); return }
+  if (m === "history") { selectHistory(); return }
   if ((m === "video" || m === "report") && (state.view === "all" || state.active < 0)) await selectClip(Math.max(0, state.active));
   setMode(m);
 }
@@ -1588,7 +1648,7 @@ function addFiles(files, kind = "pitch") {
       hand: "auto", view: "auto", t0: 0, t1: 0, status: "new", label: state.lastLabel, batch, autoLabel: true, kind });
   }
   if (state.clips.length === before) return;
-  if (state.active < 0 || state.view === "clip") selectClip(state.active < 0 ? 0 : before); else { renderTabs(); renderCombined() }
+  if (state.active < 0 || state.view !== "all") selectClip(state.active < 0 ? 0 : before); else { renderTabs(); renderCombined() }
 }
 const isSwing = (c) => c.kind === "swing";
 const viewName = (c) => !c.findings ? "Not analyzed yet" : c.useView === "side" ? "Side view" : isSwing(c) ? "Pitcher/catcher view" : "Behind/front view";
@@ -1625,11 +1685,15 @@ function renderTabs() {
     box.insertBefore(b, before);
   });
   $("empty").hidden = state.clips.length > 0; $("addBtns").hidden = state.clips.length === 0;
-  $("tabbar").hidden = state.clips.length === 0;
+  $("tabbar").hidden = false;
   const allBtn = document.querySelector('#tabbar [data-m="all"]'); if (allBtn) allBtn.disabled = state.clips.length < 2;
-  if (!state.clips.length && state.m !== "home") setMode("home"); else updateAppTitle();
-  $("workbench").hidden = state.clips.length === 0 || state.view === "all";
+  document.querySelectorAll('#tabbar [data-m="video"], #tabbar [data-m="report"]').forEach((b) => b.disabled = !state.clips.length);
+  if (!state.clips.length && state.m !== "home" && state.m !== "history") setMode("home"); else updateAppTitle();
+  $("workbench").hidden = state.clips.length === 0 || state.view === "all" || state.view === "history";
   $("combined").hidden = state.clips.length === 0 || state.view !== "all";
+  $("history").hidden = state.view !== "history";
+  $("histOpenBtn").setAttribute("aria-pressed", state.view === "history" ? "true" : "false");
+  if (state.view === "history" && !isMob()) $("empty").hidden = true;
 }
 /* frame rate: watch a few decoded frames' timestamps. 50+ fps videos are analyzed at 60, everything else at 30 */
 async function detectFps() {
@@ -1651,6 +1715,7 @@ async function detectFps() {
   return src >= 50 ? 60 : 30;
 }
 async function ensureMeta(c) {
+  if (c.noVideo) return;
   // once per clip; callers that arrive while it's running wait for the same result instead of fighting over the video
   if (!c.metaPromise) c.metaPromise = (async () => {
     await setVideo(c);
@@ -1677,7 +1742,9 @@ async function selectClip(i) {
     $("viewSideOpt").textContent = isSwing(c) ? "Side (facing the hitter)" : "Side (1st or 3rd base)";
     $("viewBehindOpt").textContent = isSwing(c) ? "From the pitcher or catcher" : "Behind or in front";
     if (c.duration > 20 && !c.sm) $("stageStatus").textContent = `This clip is ${fmt(c.duration)} s long. Set "Analyze from" and "to" around the pitch (up to about 10 s) to keep it quick.`;
-    await seek(c.events ? c.fs0 + c.events.fs / FPS : Math.min(c.duration / 2, 0.5));
+    if (c.noVideo) state.vt = c.events ? c.fs0 + c.events.fs / FPS : 0; else await seek(c.events ? c.fs0 + c.events.fs / FPS : Math.min(c.duration / 2, 0.5));
+    $("analyzeBtn").disabled = !!c.noVideo; $("tapBtn").disabled = !!c.noVideo;
+    $("stageStatus").textContent = c.noVideo ? "Opened from history without its video: the body tracking is shown on its own. Key moments can still be adjusted." : $("stageStatus").textContent;
     renderStage(); renderMarkers(); renderReport(); updateOptionLabels();
     if (state.m !== "video" && state.m !== "report") setMode("video"); else updateAppTitle();
   } catch (e) { c.status = "error"; renderTabs(); $("stageStatus").textContent = e.message }
@@ -1697,10 +1764,27 @@ function renderMarkers() {
     b.style.left = (t / c.duration * 100) + "%"; b.style.top = (k === "fs" || k === "fin" ? 16 : 0) + "px"; b.textContent = "▲ " + names[k]; b.dataset.s = "▲" + names[k][0]; box.appendChild(b);
   }
 }
+/* key-moment controls live under the video so the frame is visible while adjusting */
+function renderMoments() {
+  const c = clip(), box = $("moments");
+  $("momentsBox").hidden = !(c && c.events && c.sm);
+  if (!c || !c.events || !c.sm) { box.innerHTML = ""; return }
+  const FPS = fpsOf(c), label = MOMENTS[c.kind || "pitch"];
+  box.innerHTML = ["lift", "fs", "rel", "fin"].map((k) => `<div class="chip" data-ev="${k}" role="button" tabindex="0" aria-label="Go to ${label[k]}">
+    <span class="k">${label[k]}</span><span class="v">${fmt(c.fs0 + c.events[k] / FPS)} s</span>
+    <span class="nudge"><button type="button" data-nudge="-1" aria-label="Earlier (hold to keep moving)">◀</button><button type="button" data-nudge="1" aria-label="Later (hold to keep moving)">▶</button></span></div>`).join("");
+  box.querySelectorAll(".chip").forEach((el) => {
+    const k = el.dataset.ev;
+    el.addEventListener("click", (e) => { if (e.target.closest("[data-nudge]")) return; c.focus = null; showFrame(c.fs0 + c.events[k] / FPS) });
+    el.addEventListener("keydown", (e) => { if ((e.key === "Enter" || e.key === " ") && e.target === el) { e.preventDefault(); showFrame(c.fs0 + c.events[k] / FPS) } });
+    el.querySelectorAll("[data-nudge]").forEach((b) => holdToNudge(b, c, k, +b.dataset.nudge));
+  });
+}
 function renderReport() {
   const c = clip(); const body = $("reportBody"), tally = $("tally"); const FPS = fpsOf(c);
   $("reportTitle").textContent = c ? (c.label || c.name) : "Report";
   if (!c || !c.findings) {
+    renderMoments();
     tally.innerHTML = "";
     body.innerHTML = `<p class="note">Run <b>Analyze clip</b> to get the key moments, the mechanics checks and the drills for this clip.</p>`;
     return;
@@ -1708,9 +1792,7 @@ function renderReport() {
   const n = { fix: 0, watch: 0, good: 0 }; c.findings.forEach((f) => n[f.status]++);
   tally.innerHTML = ["fix", "watch", "good"].filter((k) => n[k]).map((k) => `<span class="pill ${k}">${n[k]} ${k === "fix" ? "to fix" : k === "watch" ? "to watch" : "good"}</span>`).join("");
   const ev = c.events; const label = MOMENTS[c.kind || "pitch"];
-  const chips = ["lift", "fs", "rel", "fin"].map((k) => `<div class="chip" data-ev="${k}" role="button" tabindex="0" aria-label="Go to ${label[k]}">
-    <span class="k">${label[k]}</span><span class="v">${fmt(c.fs0 + ev[k] / FPS)} s</span>
-    <span class="nudge"><button type="button" data-nudge="-1" aria-label="Earlier (hold to keep moving)">◀</button><button type="button" data-nudge="1" aria-label="Later (hold to keep moving)">▶</button></span></div>`).join("");
+  renderMoments();
   const items = c.sorted.map((f, i) => `<div class="finding ${f.status}" data-i="${i}" tabindex="0" role="button" aria-label="Show ${esc(f.title)} on the video">
       <div class="row"><h3>${esc(f.title)}</h3><span class="pill ${f.status}">${f.info ? "Note" : f.status === "fix" ? "Fix" : f.status === "watch" ? "Watch" : "Good"}</span></div>
       <div class="meas">${esc(f.moment)} · ${esc(f.meas)}</div>
@@ -1721,7 +1803,7 @@ function renderReport() {
   const unsureSide = isSwing(c) && c.hand === "auto" && c.handConf < 0.25 && !c.handHint;
   body.innerHTML = `${poor ? `<p class="note" style="border-left:4px solid var(--watch);padding-left:10px">Body tracking was weak on this clip (blur, low light, the player partly hidden or too small in the frame). Treat these results with caution, or film again closer, in better light and with the whole body in view.</p>` : ""}
     ${unsureSide ? `<p class="note" style="border-left:4px solid var(--watch);padding-left:10px">From this angle it's hard to tell which side he bats from. It guessed ${c.useHand === "R" ? "right" : "left"}-handed. If that's wrong, change <b>Batting side</b> above. Adding a side-view clip of the same player also fixes this automatically.</p>` : ""}
-    <p class="eyebrow" style="margin-top:12px">Key moments · tap to view · tap or hold ◀ ▶ to adjust</p><div class="moments">${chips}</div>
+    <p class="note" style="margin-top:10px">Key moments are under the video${isMob() ? " on the Video screen" : ""}. Adjust them there if one is off.</p>
     <p class="eyebrow">Checks · ${c.useHand === "R" ? "right-handed" : "left-handed"} ${isSwing(c) ? "hitter" : "pitcher"}, ${viewName(c).toLowerCase()}</p>
     <div class="findings">${items}</div>
     <div class="actions">
@@ -1729,16 +1811,12 @@ function renderReport() {
       <button class="btn" id="pdfBtn" type="button">Download practice plan (PDF)</button>
       <button class="btn" id="copyBtn" type="button">Copy drill plan</button>
     </div>
+    ${savePanelHtml("clip", [c])}
     <p class="status" id="exportStatus" role="status"></p>
     <textarea id="planText" hidden readonly aria-label="Drill plan text"></textarea>
     <p class="note">${isSwing(c) ? (c.useView === "side" ? "Side views measure the most for hitters. Add a clip from the pitcher or catcher to check whether the head pulls off." : "Views from the pitcher or catcher can't measure stride, sequence, front leg or extension. Add a side-view clip facing the hitter.") : c.useView === "side" ? "Side views can't see falling off toward 1st base. Add a clip from behind to check direction." : "Behind or front views can't measure stride length or arm timing. Add a side-view clip to check those."}</p>
     ${groupOf(c).clips.length > 1 ? `<p class="note">This is one of ${groupOf(c).clips.length} clips for ${esc(groupOf(c).name)}. <button class="linkish" type="button" data-combined>See the combined report and drill plan</button></p>` : ""}`;
-  body.querySelectorAll(".chip").forEach((el) => {
-    const k = el.dataset.ev;
-    el.addEventListener("click", (e) => { if (e.target.closest("[data-nudge]")) return; if (isMob()) setMode("video"); showFrame(c.fs0 + c.events[k] / FPS) });
-    el.addEventListener("keydown", (e) => { if ((e.key === "Enter" || e.key === " ") && e.target === el) { e.preventDefault(); showFrame(c.fs0 + c.events[k] / FPS) } });
-    el.querySelectorAll("[data-nudge]").forEach((b) => holdToNudge(b, c, k, +b.dataset.nudge));
-  });
+
   body.querySelectorAll(".finding").forEach((el) => {
     const go = (e) => { if (e.target.closest("details")) return; const f = c.sorted[+el.dataset.i]; c.focus = f; $("calloutChk").checked = true; if (isMob()) setMode("video"); showFrame(c.fs0 + f.frame / FPS) };
     el.addEventListener("click", go); el.addEventListener("keydown", (e) => { if ((e.key === "Enter" || e.key === " ") && e.target === el) { e.preventDefault(); go(e) } });
@@ -1746,6 +1824,7 @@ function renderReport() {
   $("exportBtn").onclick = () => exportClips([c], c);
   $("copyBtn").onclick = () => copyText(planText(c), $("exportStatus"), $("planText"));
   $("pdfBtn").onclick = () => downloadPlanPdf(planModelClip(c), $("exportStatus"));
+  wireSavePanel(body.querySelector(".savePanel"), () => [c]);
   const cl = body.querySelector("[data-combined]"); if (cl) cl.onclick = () => selectAll();
 }
 /* tap = one frame; press and hold = keeps stepping, faster the longer it's held.
@@ -1957,13 +2036,15 @@ function renderCombined() {
           <button class="btn primary" type="button" data-act="export">Export all ${R.done.length} clips as one video (MP4)</button>
           <button class="btn" type="button" data-act="pdf">Download practice plan (PDF)</button>
           <button class="btn" type="button" data-act="copy">Copy combined drill plan</button>
-        </div>` : ""}
+        </div>
+        ${savePanelHtml("group", R.done)}` : ""}
       <p class="status" data-st role="status"></p>
       <textarea class="planText" hidden readonly aria-label="Combined drill plan text"></textarea>
     </div>`;
   }).join("") || `<div class="card"><p class="note">Upload clips to build a combined report.</p></div>`;
   root.querySelectorAll(".combo").forEach((card) => {
     const g = gs[+card.dataset.gi], st = card.querySelector("[data-st]");
+    const sp = card.querySelector(".savePanel"); if (sp) wireSavePanel(sp, () => g.clips.filter((c) => c.findings));
     card.querySelectorAll("[data-act]").forEach((b) => b.onclick = () => {
       const act = b.dataset.act;
       if (act === "analyze") analyzeGroup(g, st);
@@ -2090,6 +2171,7 @@ const safeName = (t) => (t || "pitch").replace(/[^\w\- ]+/g, "").trim().replace(
 async function exportClips(clips, single, g, stEl, btnEl) {
   const st = stEl || $("exportStatus"), btn = btnEl || $("exportBtn");
   if (state.busy) { st.textContent = "Wait for the current analysis or export to finish."; return }
+  if (clips.some((c) => c.noVideo)) { clips = clips.filter((c) => !c.noVideo); if (!clips.length) { st.textContent = "This clip was saved without its video, so it can't be exported. The report, PDF and drill plan still work."; return } }
   if (!clips.length) { st.textContent = "Analyze at least one clip first."; return }
   stopPlay();
   const first = clips[0];
@@ -2293,6 +2375,174 @@ function copyText(text, st, ta) {
   try { navigator.clipboard.writeText(text).then(() => { st.textContent = "Drill plan copied." }, fallback) } catch (e) { fallback() }
 }
 
+/* ---------------- history: saved sessions on this device (IndexedDB) ----------------
+   A saved clip keeps the body tracking, the key moments as adjusted, the settings and a summary of the checks.
+   When reopened, the checks are recomputed from the tracking, so later improvements to the app apply to old sessions. */
+let dbPromise = null;
+function openDb() {
+  if (!dbPromise) dbPromise = new Promise((resolve) => {
+    try {
+      const rq = indexedDB.open("moundcheck", 1);
+      rq.onupgradeneeded = () => { const d = rq.result; if (!d.objectStoreNames.contains("sessions")) d.createObjectStore("sessions", { keyPath: "id" }); if (!d.objectStoreNames.contains("videos")) d.createObjectStore("videos", { keyPath: "id" }) };
+      rq.onsuccess = () => resolve(rq.result); rq.onerror = () => resolve(null); rq.onblocked = () => resolve(null);
+    } catch (e) { resolve(null) }
+  });
+  return dbPromise;
+}
+async function dbDo(store, mode, fn) {
+  const d = await openDb(); if (!d) throw new Error("Saving isn't available in this browser view (private browsing or blocked storage).");
+  return new Promise((resolve, reject) => {
+    const tx = d.transaction(store, mode), st = tx.objectStore(store); let out;
+    const r = fn(st); if (r) r.onsuccess = () => { out = r.result };
+    tx.oncomplete = () => resolve(out); tx.onerror = () => reject(tx.error || new Error("Storage error")); tx.onabort = () => reject(tx.error || new Error("Storage is full or was blocked"));
+  });
+}
+const dbAll = (store) => dbDo(store, "readonly", (st) => st.getAll());
+const dbGet = (store, id) => dbDo(store, "readonly", (st) => st.get(id));
+const dbPut = (store, v) => dbDo(store, "readwrite", (st) => st.put(v));
+const dbDel = (store, id) => dbDo(store, "readwrite", (st) => st.delete(id));
+const todayIso = () => { const d = new Date(); return new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0, 10) };
+const niceDate = (iso) => { try { return new Date(iso + "T12:00:00").toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" }) } catch (e) { return iso } };
+function sessionRecord(c, date, keepVideo) {
+  const r1 = (v) => Math.round(v * 10) / 10, r2 = (v) => Math.round(v * 100) / 100;
+  const n = { fix: 0, watch: 0, good: 0 }; c.findings.forEach((f) => { if (!f.info) n[f.status]++ });
+  return {
+    id: c.savedId || "s" + Date.now().toString(36) + Math.random().toString(36).slice(2, 7), v: 1, savedAt: Date.now(), date,
+    player: (c.label || "").trim() || "Unnamed player", kind: c.kind || "pitch", name: c.name,
+    fps: fpsOf(c), W: c.W, H: c.H, fs0: c.fs0, duration: c.duration, t0: c.t0, t1: c.t1,
+    hand: c.useHand, view: c.useView, lockedView: c.lockedView || null, handHint: c.handHint || null, handConf: c.handConf ?? null,
+    torso: c.torso, launch: c.launch ?? null, noStride: !!c.noStride, quality: c.quality || null, events: { ...c.events },
+    sm: c.sm.map((f) => f.map((p) => [r1(p[0]), r1(p[1]), r2(p[2])])),
+    tally: n, findings: c.findings.map((f) => ({ id: f.id, status: f.status, title: f.title, meas: f.meas, level: f.level, info: !!f.info })),
+    hasVideo: !!(keepVideo && (c.file || c.videoBlob))
+  };
+}
+async function saveClips(clips, date, keepVideo, st) {
+  try {
+    try { if (navigator.storage && navigator.storage.persist) await navigator.storage.persist() } catch (e) {}
+    for (const c of clips) {
+      const rec = sessionRecord(c, date, keepVideo);
+      if (rec.hasVideo) await dbPut("videos", { id: rec.id, blob: c.file || c.videoBlob, type: (c.file || c.videoBlob).type || "video/mp4" });
+      else if (c.savedId) { try { await dbDel("videos", rec.id) } catch (e) {} }
+      await dbPut("sessions", rec);
+      c.savedId = rec.id; c.savedDate = date;
+    }
+    st.textContent = `Saved ${clips.length === 1 ? "to" : clips.length + " clips to"} history for ${niceDate(date)}.`;
+    renderTabs();
+  } catch (e) { st.textContent = "Couldn't save: " + (e.message || e) + (keepVideo ? " Try again without keeping the video." : "") }
+}
+function savePanelHtml(scope, clips) {
+  const mb = clips.reduce((t, c) => t + ((c.file || c.videoBlob) ? (c.file || c.videoBlob).size : 0), 0) / 1e6;
+  const saved = clips.length && clips.every((c) => c.savedId);
+  const date = (clips.find((c) => c.savedDate) || {}).savedDate || todayIso();
+  const canVideo = clips.some((c) => c.file || c.videoBlob);
+  return `<div class="savePanel">
+      <p class="eyebrow">${saved ? "Saved to history · update it" : "Save to history"}</p>
+      <div class="saveRow">
+        <label class="field">Date<input type="date" class="saveDate" value="${date}"></label>
+        <button class="btn primary saveBtn" type="button">${saved ? "Update saved" : scope === "group" ? `Save all ${clips.length} clips` : "Save"}</button>
+      </div>
+      ${canVideo ? `<label class="toggle"><input type="checkbox" class="saveVid" checked> Keep the video${clips.length > 1 ? "s" : ""} on this device (${mb.toFixed(mb < 10 ? 1 : 0)} MB)</label>` : ""}
+      <p class="status saveStatus" role="status"></p>
+    </div>`;
+}
+function wireSavePanel(panel, getClips) {
+  if (!panel) return;
+  panel.querySelector(".saveBtn").onclick = async () => {
+    const clips = getClips(), st = panel.querySelector(".saveStatus");
+    const date = panel.querySelector(".saveDate").value || todayIso(); const vid = panel.querySelector(".saveVid");
+    if (clips.some((c) => !(c.label || "").trim())) st.textContent = "Tip: add the player's name first so history groups the right clips. ";
+    st.textContent += "Saving…";
+    await saveClips(clips, date, vid ? vid.checked : false, st);
+  };
+}
+function selectHistory() { stopPlay(); state.view = "history"; renderTabs(); renderHistory(); setMode("history"); window.scrollTo({ top: 0 }) }
+async function renderHistory() {
+  const body = $("histBody");
+  let recs;
+  try { recs = await dbAll("sessions") } catch (e) { body.innerHTML = `<p class="note">${esc(e.message || e)}</p>`; return }
+  try { const est = navigator.storage && navigator.storage.estimate ? await navigator.storage.estimate() : null; $("histUsage").textContent = est ? `${(est.usage / 1e6).toFixed(0)} MB used` : "" } catch (e) {}
+  if (!recs.length) { body.innerHTML = `<p class="note">Nothing saved yet. Analyze a clip, then use <b>Save to history</b> at the bottom of its report or the Team plan.</p>`; return }
+  const players = new Map();
+  for (const r of recs) { const k = r.player.toLowerCase(); if (!players.has(k)) players.set(k, { name: r.player, recs: [] }); players.get(k).recs.push(r) }
+  const list = [...players.values()].map((p) => ({ ...p, last: p.recs.reduce((m, r) => r.date > m ? r.date : m, "") })).sort((a, b) => b.last.localeCompare(a.last));
+  body.innerHTML = list.map((p, pi) => {
+    const kinds = ["pitch", "swing"].filter((k) => p.recs.some((r) => r.kind === k));
+    return `<details class="player" ${pi === 0 ? "open" : ""}>
+      <summary><span class="pname">${esc(p.name)}</span><span class="meta">${p.recs.length} clip${p.recs.length === 1 ? "" : "s"} · last ${niceDate(p.last)}</span></summary>
+      ${kinds.map((k) => playerKindHtml(p, k, pi)).join("")}
+    </details>`;
+  }).join("");
+  body.querySelectorAll("[data-open]").forEach((b) => b.onclick = () => openSessions(b.dataset.open.split(",")));
+  body.querySelectorAll("[data-del]").forEach((b) => b.onclick = async () => {
+    if (b.dataset.confirm !== "1") { b.dataset.confirm = "1"; b.textContent = "Tap again to delete"; setTimeout(() => { b.dataset.confirm = ""; b.textContent = "Delete" }, 3000); return }
+    for (const id of b.dataset.del.split(",")) { try { await dbDel("sessions", id); await dbDel("videos", id) } catch (e) {} const c = state.clips.find((x) => x.savedId === id); if (c) { c.savedId = null; c.savedDate = null } }
+    $("histStatus").textContent = "Deleted."; renderHistory();
+  });
+}
+function playerKindHtml(p, kind, pi) {
+  const recs = p.recs.filter((r) => r.kind === kind);
+  const dates = [...new Set(recs.map((r) => r.date))].sort().reverse();
+  const CK = ckOf(kind), ids = Object.keys(CK).filter((id) => recs.some((r) => r.findings.some((f) => f.id === id && !f.info)));
+  const cols = dates.slice(0, 6);
+  const worst = (date, id) => { let w = null; for (const r of recs) if (r.date === date) for (const f of r.findings) if (f.id === id && !f.info && (!w || RANK[f.status] > RANK[w])) w = f.status; return w };
+  const table = `<div class="trendWrap"><table class="trend"><thead><tr><th>Check</th>${cols.map((d) => `<th>${esc(niceDate(d).replace(/, \d{4}$/, ""))}</th>`).join("")}</tr></thead><tbody>
+    ${ids.map((id) => `<tr><td>${esc(CK[id].name)}</td>${cols.map((d) => { const w = worst(d, id); return `<td>${w ? `<span class="pill sm ${w}">${w === "fix" ? "Fix" : w === "watch" ? "Watch" : "Good"}</span>` : `<span class="na">·</span>`}</td>` }).join("")}</tr>`).join("")}
+  </tbody></table></div>`;
+  const sessions = dates.map((d) => {
+    const rs = recs.filter((r) => r.date === d); const t = { fix: 0, watch: 0, good: 0 }; rs.forEach((r) => { t.fix += r.tally.fix; t.watch += r.tally.watch; t.good += r.tally.good });
+    const ids = rs.map((r) => r.id).join(",");
+    return `<div class="sess">
+      <div class="sessHead"><b>${esc(niceDate(d))}</b><span class="tally">${["fix", "watch", "good"].filter((k) => t[k]).map((k) => `<span class="pill sm ${k}">${t[k]} ${k}</span>`).join("")}</span></div>
+      <div class="sessClips">${rs.map((r) => `<span class="angle">${r.view === "side" ? "Side" : kind === "swing" ? "Pitcher/catcher" : "Behind/front"} · ${esc(r.name)}${r.hasVideo ? "" : " · no video"}</span>`).join("")}</div>
+      <div class="sessActions"><button class="btn primary" type="button" data-open="${ids}">Open</button><button class="btn" type="button" data-del="${ids}">Delete</button></div>
+    </div>`;
+  }).join("");
+  return `<div class="pk"><p class="eyebrow">${KIND_WORD[kind]} · progress by date${dates.length > 6 ? " (latest 6)" : ""}</p>${table}<p class="eyebrow" style="margin-top:12px">${KIND_WORD[kind]} sessions</p>${sessions}</div>`;
+}
+async function openSessions(ids) {
+  const st = $("histStatus"); st.textContent = "Opening…";
+  let first = -1;
+  try {
+    for (const id of ids) {
+      const existing = state.clips.findIndex((c) => c.savedId === id);
+      if (existing >= 0) { if (first < 0) first = existing; continue }
+      const r = await dbGet("sessions", id); if (!r) continue;
+      let blob = null; if (r.hasVideo) { try { const v = await dbGet("videos", id); blob = v && v.blob } catch (e) {} }
+      const c = { id: Math.random().toString(36).slice(2), name: r.name, label: r.player, kind: r.kind, fps: r.fps, W: r.W, H: r.H, fs0: r.fs0, duration: r.duration,
+        t0: r.t0, t1: r.t1, hand: r.hand, view: r.view, lockedView: r.lockedView, handHint: r.handHint, handConf: r.handConf, autoHand: r.hand, autoView: r.view,
+        torso: r.torso, launch: r.launch, noStride: r.noStride, quality: r.quality, events: { ...r.events }, sm: r.sm, status: "done",
+        savedId: r.id, savedDate: r.date, autoLabel: false, batch: "saved-" + r.date, metaPromise: Promise.resolve() };
+      if (blob) { c.videoBlob = blob; c.file = blob; c.url = URL.createObjectURL(blob) } else { c.noVideo = true; c.url = null }
+      analyze(c);
+      state.clips.push(c); if (first < 0) first = state.clips.length - 1;
+    }
+    st.textContent = "";
+    if (first >= 0) await selectClip(first);
+  } catch (e) { st.textContent = "Couldn't open: " + (e.message || e) }
+}
+async function downloadBackup() {
+  const st = $("histStatus");
+  try {
+    const recs = await dbAll("sessions");
+    if (!recs.length) { st.textContent = "Nothing to back up yet."; return }
+    const data = JSON.stringify({ app: "Mound Check", kind: "history-backup", v: 1, exported: new Date().toISOString(), sessions: recs });
+    await saveBlob(new Blob([data], { type: "application/json" }), `mound-check-history-${todayIso()}.json`, st);
+    if (/Saved|Downloaded/.test(st.textContent)) st.textContent += " Videos aren't included in backups; results, tracking and key moments are.";
+  } catch (e) { st.textContent = "Backup failed: " + (e.message || e) }
+}
+async function restoreBackup(file) {
+  const st = $("histStatus");
+  try {
+    const j = JSON.parse(await file.text());
+    if (!j || j.kind !== "history-backup" || !Array.isArray(j.sessions)) throw new Error("That file isn't a Mound Check backup.");
+    const have = new Set((await dbAll("sessions")).map((r) => r.id)); let added = 0;
+    for (const r of j.sessions) { if (!r || !r.id || !r.sm || have.has(r.id)) continue; await dbPut("sessions", { ...r, hasVideo: false }); added++ }
+    st.textContent = `Restored ${added} saved clip${added === 1 ? "" : "s"}${j.sessions.length - added ? ` (${j.sessions.length - added} were already here)` : ""}.`;
+    renderHistory();
+  } catch (e) { st.textContent = "Restore failed: " + (e.message || e) }
+}
+
 /* ---------------- events ---------------- */
 $("fileIn").addEventListener("change", (e) => { addFiles([...e.target.files], "pitch"); e.target.value = "" });
 $("fileInBat").addEventListener("change", (e) => { addFiles([...e.target.files], "swing"); e.target.value = "" });
@@ -2303,6 +2553,13 @@ $("playBtn").onclick = async () => {
   const c = clip(); if (!c) return;
   if (state.playing) { stopPlay(); return }
   c.focus = null; video.playbackRate = $("slowChk").checked ? 0.25 : 1;
+  if (c.noVideo) { // play the saved body tracking on its own
+    if ((state.vt || 0) >= c.duration - 0.05) state.vt = 0;
+    state.playing = true; setPlayIcon(true); let last = performance.now();
+    const tick = (now) => { if (!state.playing) return; state.vt += (now - last) / 1000 * ($("slowChk").checked ? 0.25 : 1); last = now;
+      if (state.vt >= c.duration) { state.vt = c.duration; stopPlay(); return } renderStage(); state.raf = requestAnimationFrame(tick) };
+    state.raf = requestAnimationFrame(tick); return;
+  }
   if (video.currentTime >= video.duration - 0.05) await seek(0);
   state.playing = true; setPlayIcon(true);
   try { await video.play() } catch (e) { state.playing = false; setPlayIcon(false); return }
@@ -2311,9 +2568,9 @@ $("playBtn").onclick = async () => {
 video.addEventListener("ended", () => stopPlay());
 $("slowChk").onchange = () => { video.playbackRate = $("slowChk").checked ? 0.25 : 1 };
 $("skelChk").onchange = renderStage; $("calloutChk").onchange = () => { const c = clip(); if (c) c.focus = null; renderStage() };
-$("stepBack").onclick = () => { const c = clip(); if (c) { c.focus = null; showFrame(Math.max(0, video.currentTime - 1 / fpsOf(c))) } };
-$("stepFwd").onclick = () => { const c = clip(); if (c) { c.focus = null; showFrame(Math.min(video.duration, video.currentTime + 1 / fpsOf(c))) } };
-$("scrub").addEventListener("input", async (e) => { scrubbing = true; const c = clip(); if (!c) return; c.focus = null; stopPlay(); await seek(+e.target.value / 1000 * video.duration); renderStage() });
+$("stepBack").onclick = () => { const c = clip(); if (c) { c.focus = null; showFrame(Math.max(0, curT(c) - 1 / fpsOf(c))) } };
+$("stepFwd").onclick = () => { const c = clip(); if (c) { c.focus = null; showFrame(Math.min(durOf(c), curT(c) + 1 / fpsOf(c))) } };
+$("scrub").addEventListener("input", async (e) => { scrubbing = true; const c = clip(); if (!c) return; c.focus = null; await showFrame(+e.target.value / 1000 * durOf(c)) });
 $("scrub").addEventListener("change", () => { scrubbing = false });
 $("analyzeBtn").onclick = runAnalysis;
 $("nameIn").addEventListener("input", (e) => {
@@ -2330,7 +2587,7 @@ $("viewSel").onchange = (e) => { const c = clip(); if (!c) return; c.view = e.ta
 $("t0In").onchange = (e) => { const c = clip(); if (c) c.t0 = +e.target.value || 0 };
 $("t1In").onchange = (e) => { const c = clip(); if (c) c.t1 = +e.target.value || c.duration };
 $("removeBtn").onclick = () => {
-  const c = clip(); if (!c) return; stopPlay(); URL.revokeObjectURL(c.url);
+  const c = clip(); if (!c) return; stopPlay(); if (c.url) URL.revokeObjectURL(c.url);
   state.clips.splice(state.active, 1); state.active = state.clips.length ? Math.min(state.active, state.clips.length - 1) : -1;
   video.removeAttribute("src"); video.load();
   if (state.active >= 0) selectClip(state.active); else { state.view = "clip"; renderTabs(); renderReport() }
@@ -2356,11 +2613,15 @@ document.addEventListener("keydown", (e) => {
   if (e.key === "ArrowLeft") { e.preventDefault(); $("stepBack").click() }
 });
 document.querySelectorAll("#tabbar button").forEach((b) => b.addEventListener("click", () => goScreen(b.dataset.m)));
+$("histOpenBtn").onclick = () => selectHistory(); $("emptyHistBtn").onclick = () => selectHistory();
+$("backupBtn").onclick = () => downloadBackup();
+$("histCloseBtn").onclick = () => { if (state.clips.length) selectClip(Math.min(state.active, state.clips.length - 1)); else { state.view = "clip"; renderTabs(); setMode("home") } };
+$("restoreIn").addEventListener("change", (e) => { const f = e.target.files && e.target.files[0]; if (f) restoreBackup(f); e.target.value = "" });
 if (isMob()) $("setDetails").open = false;
-setMode("home");
+renderTabs(); setMode("home");
 // warm the model in the background once the page is idle
 setTimeout(() => { loadModel().catch(() => {}) }, 1500);
-window.__moundcheck = { state, analyze, detectEvents, planText, groupPlanText, combine, groups, selectAll, exportClips, downloadPlanPdf, planModelGroup };
+window.__moundcheck = { state, analyze, detectEvents, planText, groupPlanText, combine, groups, selectAll, exportClips, downloadPlanPdf, planModelGroup, selectClip, selectHistory };
 })();
 </script>
 
