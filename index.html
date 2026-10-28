@@ -65,6 +65,7 @@ header.top { display: flex; flex-wrap: wrap; align-items: flex-end; justify-cont
 .clipTab[aria-selected="true"] { background: var(--ink); color: var(--bg); border-color: var(--ink) }
 .clipTab .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--muted); flex: none }
 .clipTab .dot.done { background: var(--good) } .clipTab .dot.busy { background: var(--watch) } .clipTab .dot.err { background: var(--fix) }
+.clipTab .kind { font: 700 .66rem var(--f-display); letter-spacing: .08em; text-transform: uppercase; border: 1px solid currentColor; border-radius: 4px; padding: 0 4px; opacity: .8 }
 .clipTab .nm { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 22ch }
 /* drop zone / empty */
 .drop { border: 2px dashed var(--line); border-radius: 16px; padding: 28px; display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 260px); gap: 24px; align-items: center; background: var(--surface) }
@@ -147,25 +148,30 @@ textarea.planText, textarea#planText { width: 100%; min-height: 160px; font: .85
   <header class="top">
     <div class="brand">
       <h1>Mound <span>Check</span></h1>
-      <p>Upload bullpen clips from one or more angles. It tracks the pitcher's body, finds leg lift, foot strike, release and finish, checks the mechanics, and combines every angle into one drill plan and one annotated video.</p>
+      <p>Upload pitching or batting clips from one or more angles. It tracks the player's body, finds the key moments of the pitch or swing, checks the mechanics, and combines every angle into one drill plan and one annotated video.</p>
     </div>
     <div class="clips" id="clips" role="tablist" aria-label="Uploaded clips">
-      <label class="btn primary" for="fileIn" id="addBtn" hidden>Add videos</label>
+      <span id="addBtns" class="clips" hidden>
+        <label class="btn primary" for="fileIn">Add pitching videos</label>
+        <label class="btn primary" for="fileInBat">Add batting videos</label>
+      </span>
       <input id="fileIn" type="file" accept="video/*,.mov,.mp4,.m4v,.webm" multiple hidden>
+      <input id="fileInBat" type="file" accept="video/*,.mov,.mp4,.m4v,.webm" multiple hidden>
     </div>
   </header>
 
   <section id="empty" class="drop" aria-label="Upload area">
     <div>
       <p class="eyebrow">Start here</p>
-      <h2>Drop pitching videos here</h2>
+      <h2>Upload pitching or batting videos</h2>
       <p>Each clip gets its own report. Nothing leaves your browser: the body tracking runs on this device.</p>
       <ul>
-        <li>One pitch per clip works best, 3 to 10 seconds long.</li>
+        <li>One pitch or one swing per clip works best, 3 to 10 seconds long.</li>
         <li>Film the whole body, phone held steady at hip height.</li>
-        <li>A side view (from 1st- or 3rd-base side) measures the most. A view from behind shows direction to the plate.</li>
+        <li>Pitching: a side view (1st- or 3rd-base side) measures the most. A view from behind shows direction to the plate.</li>
+        <li>Batting: a side view facing the hitter measures the most. A view from the pitcher or catcher shows whether the head pulls off.</li>
       </ul>
-      <label class="btn primary" for="fileIn">Choose videos</label>
+      <div class="actions"><label class="btn primary" for="fileIn">Upload pitching videos</label><label class="btn primary" for="fileInBat">Upload batting videos</label></div>
     </div>
     <svg viewBox="0 0 260 300" role="img" aria-label="Example of the overlay: a stick figure at foot strike with the glove circled and the stride measured">
       <rect x="0" y="0" width="260" height="300" rx="14" fill="var(--stage)"/>
@@ -183,7 +189,7 @@ textarea.planText, textarea#planText { width: 100%; min-height: 160px; font: .85
       <line x1="72" y1="262" x2="196" y2="262" stroke="#ffd23f" stroke-width="3" stroke-dasharray="7 6"/>
       <line x1="222" y1="240" x2="222" y2="276" stroke="#4fd38c" stroke-width="3"/>
       <rect x="14" y="16" width="232" height="34" rx="8" fill="rgba(0,0,0,.55)"/>
-      <text x="26" y="39" fill="#fff" font-family="Saira Condensed, Arial Narrow, sans-serif" font-weight="700" font-size="17">FOOT STRIKE · GLOVE DROPS EARLY</text>
+      <text x="26" y="39" fill="#fff" font-family="Saira Condensed, Arial Narrow, sans-serif" font-weight="700" font-size="17">GLOVE DROPS EARLY</text>
       <text x="134" y="284" fill="#ffd23f" font-family="IBM Plex Sans, sans-serif" font-size="12" text-anchor="middle">stride ≈ 66% of height</text>
     </svg>
   </section>
@@ -209,13 +215,13 @@ textarea.planText, textarea#planText { width: 100%; min-height: 160px; font: .85
         <label class="toggle"><input type="checkbox" id="calloutChk" checked> Callouts at key moments</label>
       </div>
       <div class="settings">
-        <label class="field">Pitcher name<input id="nameIn" type="text" placeholder="e.g. Jake R." aria-describedby="nameHint"></label>
-        <label class="field">Throwing hand<select id="handSel"><option value="auto">Auto</option><option value="R">Right-handed</option><option value="L">Left-handed</option></select></label>
-        <label class="field">Camera view<select id="viewSel"><option value="auto">Auto</option><option value="side">Side (1st or 3rd base)</option><option value="behind">Behind or in front</option></select></label>
+        <label class="field">Player name<input id="nameIn" type="text" placeholder="e.g. Jake R." aria-describedby="nameHint"></label>
+        <label class="field"><span id="handLbl">Throwing hand</span><select id="handSel"><option value="auto">Auto</option><option value="R">Right-handed</option><option value="L">Left-handed</option></select></label>
+        <label class="field">Camera view<select id="viewSel"><option value="auto">Auto</option><option value="side" id="viewSideOpt">Side (1st or 3rd base)</option><option value="behind" id="viewBehindOpt">Behind or in front</option></select></label>
         <label class="field">Analyze from (s)<input id="t0In" type="number" min="0" step="0.1" value="0"></label>
         <label class="field">to (s)<input id="t1In" type="number" min="0" step="0.1" value="0"></label>
       </div>
-      <p class="note" id="nameHint">Give every angle of the same pitcher the same name. Those clips are combined into one report and one drill plan under <b>All clips</b>.</p>
+      <p class="note" id="nameHint">Give every angle of the same player the same name. Their pitching clips and their batting clips are each combined into one report and one drill plan under <b>All clips</b>.</p>
       <div class="actions">
         <button class="btn primary" id="analyzeBtn" type="button">Analyze clip</button>
         <button class="btn" id="tapBtn" type="button">Tap the pitcher first</button>
@@ -337,6 +343,62 @@ const DRILLS = {
     steps: ["Have a partner stand behind him and watch the throwing hand at release.",
             "Throw at three-quarter speed. After each throw the partner says \"same\" or \"different\".",
             "Aim for 8 \"same\" calls in a row before adding speed."], cue: "Same window every time." },
+  hHeadTee: { dose: ["15 swings", "25 swings", "3 rounds of 15, every practice"], name: "Head-on-the-Tee Drill", reps: "25 swings",
+    steps: ["Hit off a tee. After contact, keep the eyes on the spot where the ball was for a 2-count.",
+            "A coach or parent checks that the head didn't move toward the pitcher or pull away.",
+            "Add a ball on the ground in front of the tee as a target to keep looking at."], cue: "See the ball hit the bat." },
+  hStrideHold: { dose: ["10 reps", "15 reps", "2 sets of 15, every practice"], name: "Stride-and-Hold Drill", reps: "15 reps",
+    steps: ["Get into the stance and take the normal stride without swinging.",
+            "Freeze when the front foot lands. The head should still be between the feet, hands still back.",
+            "Shorten the stride until he can land and hold it without the head moving forward."], cue: "Step, don't lunge." },
+  hNoStride: { dose: ["15 swings", "25 swings", "3 rounds of 15, every practice"], name: "No-Stride Tee Work", reps: "25 swings",
+    steps: ["Start with the feet already at the landing width.",
+            "Swing with only a slight weight shift, no step.",
+            "This teaches power from rotation instead of from lunging forward."], cue: "Turn, don't travel." },
+  hHighTee: { dose: ["15 swings", "25 swings", "3 rounds of 15, every practice"], name: "High Tee Drill", reps: "25 swings",
+    steps: ["Set the tee at the top of the strike zone.",
+            "Hit line drives without hitting the tee itself.",
+            "A dropping barrel hits the tee or pops the ball up, so he learns to keep the hands up and the path short."], cue: "Knob to the ball, stay on top." },
+  hOneHandTop: { dose: ["10 swings each", "15 swings", "2 sets of 15, every practice"], name: "Top-Hand One-Hand Drill", reps: "15 swings",
+    steps: ["Choke up on a short or light bat and hold it with the top hand only.",
+            "Hit off a tee, keeping the hand above the ball and the palm facing up at contact.",
+            "Keep the swing short. If the barrel drops, choke up more."], cue: "Palm up at contact." },
+  hBatBehindBack: { dose: ["10 reps", "15 reps", "2 sets of 15, daily"], name: "Bat-Behind-Back Hip Turns", reps: "15 reps",
+    steps: ["Hold a bat across the lower back in the crooks of the elbows.",
+            "Stride, then turn the hips toward the pitcher while the shoulders stay closed for a moment.",
+            "Let the shoulders follow the hips. Feel the stretch across the stomach."], cue: "Hips go, shoulders wait." },
+  hSeparation: { dose: ["10 swings", "15 swings", "2 sets of 15, every practice"], name: "Stride-and-Separate Drill", reps: "15 swings",
+    steps: ["Stride, and as the front foot lands, let the hands drift slightly back toward the catcher.",
+            "Pause for a beat in that stretched position, then swing.",
+            "Remove the pause over time so it becomes one smooth move."], cue: "Foot down, hands back, then fire." },
+  hFrontBrace: { dose: ["15 swings", "25 swings", "3 rounds of 15, every practice"], name: "Front-Side Brace Drill", reps: "25 swings",
+    steps: ["Set up so the front foot lands against a base, a 2x4 or a coach's foot.",
+            "Swing and push into the ground with the front leg so the knee straightens at contact.",
+            "Hold the finish with the weight over a firm front leg."], cue: "Hit against a firm front side." },
+  hDoubleTee: { dose: ["15 swings", "25 swings", "3 rounds of 15, every practice"], name: "Double Tee Drill", reps: "25 swings",
+    steps: ["Set two tees in a line toward the pitcher, about a ball's length or two apart.",
+            "Put the ball on the back tee and swing through it so the barrel also clips the front tee.",
+            "Reaching the front tee teaches extension through the ball."], cue: "Through the ball, not at it." },
+  hBottomHand: { dose: ["10 swings", "15 swings", "2 sets of 15, every practice"], name: "Bottom-Hand One-Hand Drill", reps: "15 swings",
+    steps: ["Hold a short or light bat with the bottom (lead) hand only.",
+            "Hit off a tee, leading with the knob and extending the lead arm through contact.",
+            "Finish high with the lead arm long, not bent up beside the body."], cue: "Long through the zone." },
+  hHoldFinish: { dose: ["Last 5 swings of each round", "Every tee swing", "Every swing, tee and live"], name: "Hold-the-Finish Swings", reps: "Every tee swing",
+    steps: ["After every swing, hold the finish for a 3-count.",
+            "Weight on a firm front leg, back toe pivoted, head still over the base.",
+            "If he can't hold it, the swing was out of control. Slow down."], cue: "Swing hard, finish in balance." },
+  hFeetTogether: { dose: ["10 swings", "15 swings", "2 sets of 15, every practice"], name: "Feet-Together Swings", reps: "15 swings",
+    steps: ["Start with the feet together, then take a small step to stride and swing.",
+            "The narrow start forces him to stay centered and balanced.",
+            "Hold the finish each time."], cue: "Stay centered." },
+  hLoadHold: { dose: ["10 reps", "15 reps", "2 sets of 15, daily"], name: "Stance and Load Holds", reps: "15 reps",
+    steps: ["Get into the stance, then load (hands back, small weight shift) and freeze for a 3-count.",
+            "Check that the head is between the feet and the weight is on the inside of the back foot.",
+            "Then stride and swing from that position."], cue: "Load, don't lean." },
+  hRepeat: { dose: ["20 swings", "30 swings", "3 rounds of 15, every practice"], name: "Same-Swing Rounds", reps: "30 swings",
+    steps: ["Hit rounds off a tee or soft toss at about 75% effort.",
+            "After each swing, a coach says \"same\" if the load, stride and finish looked the same as the last one.",
+            "Aim for five \"same\" swings in a row before swinging harder."], cue: "Repeat it." },
   balanceHold: { dose: ["1 set of 8", "2 sets of 8", "3 sets of 8, every practice"], name: "Balance Point Holds", reps: "2 sets of 8",
     steps: ["Lift the leg to the balance point and hold for a 3-count.",
             "Head stays stacked over the back foot, chest tall, no lean toward the plate or 1st base.",
@@ -492,7 +554,7 @@ function speedSeries(K, idx, torso) {
   const v = K.map((f, i) => i ? dist(f[idx], K[i - 1][idx]) / torso : 0);
   return v.map((_, i) => (v[Math.max(0, i - 1)] + v[i] + v[Math.min(v.length - 1, i + 1)]) / 3);
 }
-function detectEvents(c) {
+function detectPitchEvents(c) {
   const K = c.sm, T = K.length;
   const torso = median(K.map((f) => dist(mid(f[5], f[6]), mid(f[11], f[12])))) || 1;
   const vl = speedSeries(K, 9, torso), vr = speedSeries(K, 10, torso);
@@ -519,7 +581,7 @@ function detectEvents(c) {
   c.events = { lift, fs, rel, fin };
   c.torso = torso;
 }
-function analyze(c) {
+function analyzePitch(c) {
   const K = c.sm, T = K.length, torso = c.torso;
   const hand = c.hand === "auto" ? c.autoHand : c.hand;
   const S = sides(hand), G = S.g, Tt = S.t;
@@ -779,6 +841,191 @@ function analyze(c) {
   c.sorted = [...F].sort((a, b) => order[a.status] - order[b.status] || a.frame - b.frame);
 }
 
+
+/* ================= batting ================= */
+// lead side = the side facing the pitcher (left for a right-handed hitter); reuses sides(): g = lead, t = back
+function detectSwingEvents(c) {
+  const K = c.sm, T = K.length;
+  const torso = median(K.map((f) => dist(mid(f[5], f[6]), mid(f[11], f[12])))) || 1;
+  const disp = (k) => { const m = [median(K.map((f) => f[k][0])), median(K.map((f) => f[k][1]))]; return pct(K.map((f) => dist(f[k], m)), 0.95) };
+  c.autoHand = disp(15) >= disp(16) ? "R" : "L"; // the striding foot is the lead foot
+  const hand = c.hand === "auto" ? c.autoHand : c.hand, S = sides(hand);
+  const hands = (i) => mid(K[i][9], K[i][10]);
+  const hv = K.map((f, i) => i ? dist(hands(i), hands(i - 1)) / torso : 0);
+  const v = hv.map((_, i) => (hv[Math.max(0, i - 1)] + hv[i] + hv[Math.min(T - 1, i + 1)]) / 3);
+  let contact = 2, pk = -1; for (let i = 2; i < T - 2; i++) if (v[i] > pk) { pk = v[i]; contact = i }
+  let launch = contact; while (launch > 1 && v[launch - 1] > 0.25 * pk) launch--;
+  const win0 = Math.max(0, launch - Math.round(1.0 * FPS));
+  // foot plant: the lead foot's own stride motion settles (hitters' strides are small, so this is relative to its peak speed)
+  const av = speedSeries(K, S.g.an, torso);
+  const top = Math.min(contact - 1, launch + 2);
+  let peak = 0; for (let i = win0; i <= top; i++) peak = Math.max(peak, av[i]);
+  let plant = launch;
+  if (peak > 0.012) for (let i = top; i >= win0; i--) if (av[i] > 0.3 * peak) { plant = Math.min(contact - 1, i + 1); break }
+  if (plant <= 0) plant = Math.max(1, launch);
+  // load: hands farthest back from the lead shoulder, at or before foot plant
+  let load = win0, best = -1; for (let i = win0; i <= Math.max(win0, plant - 1); i++) { const d = dist(hands(i), K[i][S.g.sh]); if (d > best) { best = d; load = i } }
+  if (load >= plant) load = Math.max(0, plant - 1);
+  let rel = contact; if (rel <= plant) rel = Math.min(T - 1, plant + 1);
+  const fin = Math.min(T - 1, rel + Math.round(0.35 * FPS));
+  c.events = { lift: load, fs: plant, rel, fin }; c.torso = torso; c.launch = launch;
+}
+function analyzeSwing(c) {
+  const K = c.sm, T = K.length, torso = c.torso;
+  const hand = c.hand === "auto" ? c.autoHand : c.hand;
+  const S = sides(hand), G = S.g, Tt = S.t;
+  const E = c.events, load = E.lift, plant = E.fs, contact = E.rel, fin = E.fin;
+  const hpm = (i) => mid(K[i][11], K[i][12]), hands = (i) => mid(K[i][9], K[i][10]);
+  const headPt = (i) => { const pts = [0, 1, 2, 3, 4].map((k) => K[i][k]).filter((q) => q[2] > 0.25); const q = pts.length ? pts : [K[i][0]]; return [q.reduce((t, x) => t + x[0], 0) / q.length, q.reduce((t, x) => t + x[1], 0) / q.length] };
+  const ang3 = (a, b, cc) => { const v1 = [a[0] - b[0], a[1] - b[1]], v2 = [cc[0] - b[0], cc[1] - b[1]]; const d = Math.hypot(...v1) * Math.hypot(...v2) || 1; return Math.acos(Math.max(-1, Math.min(1, (v1[0] * v2[0] + v1[1] * v2[1]) / d))) * 180 / Math.PI };
+  const st3 = (bad, watchT, fixT, heavyT) => bad >= heavyT ? ["fix", true] : bad >= fixT ? ["fix", false] : bad >= watchT ? ["watch", false] : ["good", false];
+  const pre = K.slice(0, Math.max(1, plant));
+  const height = pct(pre.map((f) => Math.max(f[15][1], f[16][1]) - f[0][1]), 0.9) * 1.1 || torso * 3.3;
+  const shW = Math.abs(K[load][5][0] - K[load][6][0]) / torso;
+  const autoView = shW > 0.45 ? "side" : "behind";
+  const view = c.view === "auto" ? autoView : c.view;
+  const pdir = Math.sign(K[plant][G.an][0] - K[plant][Tt.an][0]) || 1;
+  c.autoView = autoView; c.useHand = hand; c.useView = view; c.height = height; c.dir = pdir;
+  c.strideR = null; c.slot = null; c.tempo = (contact - plant) / FPS; c.headMove = null;
+  const F = [];
+  const win0 = Math.max(0, (c.launch || plant) - Math.round(1.0 * FPS));
+  // 1. balance at load (side)
+  if (view === "side") {
+    const la = K[load][G.an], ba = K[load][Tt.an], h = headPt(load);
+    const span = Math.max(torso * 0.3, Math.abs(la[0] - ba[0])), m = (la[0] + ba[0]) / 2;
+    const r = Math.abs(h[0] - m) / (span / 2);
+    const [st, ex] = st3(r, 1.0, 1.3, 1.7);
+    F.push({ id: "sBalance", frame: load, moment: "Load", status: st, extreme: ex,
+      title: st === "good" ? "Balanced in the load" : "Head outside the feet in the load",
+      meas: `Head ${r <= 1 ? "inside" : "outside"} the feet (${(r * 100).toFixed(0)}% of half the stance)`,
+      body: st === "good" ? "In the load the head stays between the feet, so he can move forward under control."
+        : "In the load the head sits outside his base. Leaning that far makes it hard to stay balanced and see the ball.",
+      drills: st === "good" ? [] : ["hLoadHold", "hFeetTogether"], ann: [{ t: "balanceLine", col: st }] });
+  }
+  // 2. stride length (side)
+  if (view === "side") {
+    const a0 = K[win0][G.an], a1 = K[plant][G.an];
+    const sr = Math.abs(a1[0] - a0[0]) / height; c.strideR = sr;
+    const [st, ex] = st3(sr / 0.3, 1, 1.33, 1.7);
+    F.push({ id: "sStride", frame: plant, moment: "Foot plant", status: st, extreme: ex,
+      title: st === "good" ? "Controlled stride" : "Overstrides",
+      meas: `Stride ≈ ${(sr * 100).toFixed(0)}% of height`,
+      body: st === "good" ? "The stride is short and controlled, so the head and eyes stay quiet as he gets his foot down."
+        : "The stride is long. Overstriding drops the head and eyes, pulls weight forward early and makes it hard to adjust to off-speed.",
+      drills: st === "good" ? [] : ["hStrideHold", "hNoStride"], ann: [{ t: "swingStride", from: win0, col: st }] });
+  }
+  // 3. head movement load -> contact
+  {
+    const h0 = headPt(load), h1 = headPt(contact);
+    let bad, meas, title, body;
+    if (view === "side") {
+      const fwd = ((h1[0] - h0[0]) * pdir) / torso, drop = (h1[1] - h0[1]) / torso;
+      bad = Math.max(fwd / 0.35, drop / 0.4); c.headMove = Math.max(0, fwd);
+      meas = `Head moves ${Math.max(0, fwd).toFixed(2)} torso-lengths forward, ${Math.max(0, drop).toFixed(2)} down`;
+      title = fwd / 0.35 >= drop / 0.4 ? "Lunges toward the pitcher" : "Head drops during the swing";
+      body = fwd / 0.35 >= drop / 0.4 ? "The head drifts toward the pitcher between the load and contact. Lunging takes power out of the back side and makes the eyes move while tracking the ball."
+        : "The head drops noticeably between the load and contact, which changes his eye level right when he needs to see the ball.";
+    } else {
+      const lat = Math.abs(h1[0] - h0[0]) / torso; bad = lat / 0.3; c.headMove = lat;
+      meas = `Head moves ${lat.toFixed(2)} torso-lengths sideways`;
+      title = "Pulls the head off the ball";
+      body = "The head moves sideways during the swing instead of staying still. Pulling off usually means the front shoulder flies open and the eyes leave the hitting zone early.";
+    }
+    const [st, ex] = st3(bad, 1, 1.7, 2.5);
+    F.push({ id: "sHead", frame: contact, moment: "Contact", status: st, extreme: ex,
+      title: st === "good" ? "Head stays still through contact" : title, meas,
+      body: st === "good" ? "The head stays quiet from the load to contact, so the eyes can track the ball into the zone." : body,
+      drills: st === "good" ? [] : view === "side" ? ["hHeadTee", "hStrideHold"] : ["hHeadTee", "hBatBehindBack"], ann: [{ t: "headPath", from: load, to: contact, col: st }] });
+  }
+  // 4. hands drop before the swing
+  {
+    const y0 = hands(load)[1]; let maxY = y0, at = load;
+    for (let i = load; i <= Math.min(contact, (c.launch || plant) + 2); i++) if (hands(i)[1] > maxY) { maxY = hands(i)[1]; at = i }
+    const drop = (maxY - y0) / torso;
+    const [st, ex] = st3(drop / 0.35, 1, 1.6, 2.2);
+    F.push({ id: "sHands", frame: st === "good" ? (c.launch || plant) : at, moment: "Launch", status: st, extreme: ex,
+      title: st === "good" ? "Hands stay up into the swing" : "Hands drop before the swing",
+      meas: `Hands drop ${drop.toFixed(2)} torso-lengths from the load`,
+      body: st === "good" ? "The hands start the swing from about where they loaded, so the bat can work on a short, direct path."
+        : "The hands drop well below where they loaded before the swing starts. That usually means the barrel dumps, the swing gets long and he hits under the ball.",
+      drills: st === "good" ? [] : ["hHighTee", "hOneHandTop"], ann: [{ t: "handsPath", from: load, to: at, col: st }] });
+  }
+  // 5. hips lead the shoulders (side)
+  if (view === "side") {
+    const hw = (i) => Math.abs(K[i][11][0] - K[i][12][0]), sw = (i) => Math.abs(K[i][5][0] - K[i][6][0]);
+    let hb = 0, sb = 0; for (let i = Math.max(0, load - 3); i <= Math.min(T - 1, load + 3); i++) { hb = Math.max(hb, hw(i)); sb = Math.max(sb, sw(i)) }
+    let hs = -1, ss = -1;
+    for (let i = load; i <= Math.min(T - 1, contact + 3); i++) { if (hs < 0 && hw(i) < 0.85 * hb) hs = i; if (ss < 0 && sw(i) < 0.85 * sb) ss = i }
+    if (hs >= 0 && ss >= 0) {
+      const lead = (ss - hs) / FPS;
+      const st = lead >= 0.03 ? "good" : lead > -0.03 ? "watch" : "fix";
+      F.push({ id: "sSeq", frame: Math.min(hs, ss), moment: "Launch", status: st, extreme: lead <= -0.07,
+        title: st === "good" ? "Hips lead the shoulders" : st === "watch" ? "Hips and shoulders turn together" : "Shoulders turn before the hips",
+        meas: lead >= 0 ? `Hips start turning ${lead.toFixed(2)} s before the shoulders` : `Shoulders start turning ${(-lead).toFixed(2)} s before the hips`,
+        body: st === "good" ? "The hips start to open before the shoulders, which stretches the core and adds bat speed."
+          : "The shoulders start turning as early as or earlier than the hips. Without that hip-to-shoulder separation he swings with the arms and loses bat speed and plate coverage.",
+        drills: st === "good" ? [] : ["hBatBehindBack", "hSeparation"], ann: [{ t: "seq", hs, ss, col: st }], hl: [[11, 12], [5, 6]] });
+    }
+  }
+  // 6. front leg firm at contact (side)
+  if (view === "side") {
+    let kC = -1, at = contact; for (let i = contact; i <= Math.min(T - 1, contact + 3); i++) { const a = ang3(K[i][G.hip], K[i][G.kn], K[i][G.an]); if (a > kC) { kC = a; at = i } }
+    const bad = kC >= 150 ? 0 : (150 - kC) / 15 + 1;
+    const [st, ex] = st3(bad, 1, 2, 3);
+    F.push({ id: "sFrontLeg", frame: at, moment: "Contact", status: st, extreme: ex,
+      title: st === "good" ? "Firm front side at contact" : "Soft front knee at contact",
+      meas: `Front knee ${kC.toFixed(0)}° at contact`,
+      body: st === "good" ? "The front leg straightens into contact, giving the hips something firm to rotate against."
+        : "The front knee is still bent at contact. A front leg that firms up lets the hips stop and whip the bat. A soft one leaks the energy forward.",
+      drills: st === "good" ? [] : ["hFrontBrace", "hHoldFinish"], ann: [{ t: "joint", a: G.hip, b: G.kn, c: G.an, text: "front knee", col: st }], hl: st === "good" ? [] : [[G.hip, G.kn], [G.kn, G.an]] });
+  }
+  // 7. extension through contact (side)
+  if (view === "side") {
+    let eA = -1, at = contact; for (let i = contact; i <= Math.min(T - 1, contact + 4); i++) { const a = ang3(K[i][G.sh], K[i][G.el], K[i][G.wr]); if (a > eA) { eA = a; at = i } }
+    const bad = eA >= 155 ? 0 : (155 - eA) / 15 + 1;
+    const [st, ex] = st3(bad, 1, 2, 3);
+    F.push({ id: "sExtend", frame: at, moment: "Contact", status: st, extreme: ex,
+      title: st === "good" ? "Good extension through the ball" : "Lead elbow bends through contact",
+      meas: `Lead arm ${eA.toFixed(0)}° just after contact`,
+      body: st === "good" ? "The lead arm extends through the hitting zone, which keeps the barrel in the zone longer."
+        : "The lead elbow stays bent and pulls up through contact (a \"chicken wing\"). That cuts the swing short and takes the barrel out of the zone early.",
+      drills: st === "good" ? [] : ["hDoubleTee", "hBottomHand"], ann: [{ t: "joint", a: G.sh, b: G.el, c: G.wr, text: "lead arm", col: st }], hl: st === "good" ? [] : [[G.sh, G.el], [G.el, G.wr]] });
+  }
+  // 8. balanced finish
+  {
+    const h = headPt(fin), la = K[fin][G.an], ba = K[fin][Tt.an];
+    let bad, meas;
+    if (view === "side") {
+      const lo = Math.min(la[0], ba[0]), hi = Math.max(la[0], ba[0]), span = Math.max(torso * 0.3, hi - lo);
+      const out = h[0] < lo ? (lo - h[0]) / span : h[0] > hi ? (h[0] - hi) / span : 0;
+      bad = out / 0.2; meas = out > 0 ? `Head ${(out * 100).toFixed(0)}% of the stance outside the feet` : "Head between the feet";
+    } else {
+      const m = (la[0] + ba[0]) / 2, lat = Math.abs(h[0] - m) / torso;
+      bad = lat / 0.6; meas = `Head ${lat.toFixed(2)} torso-lengths off center`;
+    }
+    const [st, ex] = st3(bad, 1, 2.5, 4);
+    F.push({ id: "sFinish", frame: fin, moment: "Finish", status: st, extreme: ex,
+      title: st === "good" ? "Balanced finish" : "Off balance at the finish",
+      meas, body: st === "good" ? "He finishes with the head over his base and could hold the finish, a sign the swing stayed under control."
+        : "At the finish the head is outside his base and he falls off. A balanced finish usually means the swing was under control the whole way.",
+      drills: st === "good" ? [] : ["hHoldFinish", "hFeetTogether"], ann: [{ t: "balanceLine", col: st }] });
+  }
+  // 9. timing note
+  {
+    const lc = (contact - load) / FPS, pc = (contact - plant) / FPS;
+    F.push({ id: "sTiming", frame: plant, moment: "Timing", status: "good", info: true,
+      title: "Swing timing", meas: `Load → contact ${lc.toFixed(2)} s · foot plant → contact ${pc.toFixed(2)} s`,
+      body: "For reference. Compare these times across clips. A swing that repeats has similar times every time.",
+      drills: [], ann: [{ t: "tempo", tl: lc, tr: pc, labels: ["load → contact", "foot plant → contact"] }] });
+  }
+  for (const f of F) f.level = f.status === "good" ? null : f.status === "watch" ? "light" : f.extreme ? "heavy" : "standard";
+  const order = { fix: 0, watch: 1, good: 2 };
+  c.findings = F;
+  c.sorted = [...F].sort((a, b) => order[a.status] - order[b.status] || a.frame - b.frame);
+}
+function detectEvents(c) { return c.kind === "swing" ? detectSwingEvents(c) : detectPitchEvents(c) }
+function analyze(c) { return c.kind === "swing" ? analyzeSwing(c) : analyzePitch(c) }
+
 /* ---------------- drawing ---------------- */
 function rr(ctx, x, y, w, h, r) { ctx.beginPath(); ctx.roundRect ? ctx.roundRect(x, y, w, h, r) : ctx.rect(x, y, w, h) }
 const colOf = (k) => C[k] || k;
@@ -857,12 +1104,41 @@ function drawAnn(ctx, c, f, kp, u) {
       const d1 = [h[0] - kn[0], h[1] - kn[1]], d2 = [an[0] - kn[0], an[1] - kn[1]];
       const angle = Math.acos(Math.max(-1, Math.min(1, (d1[0] * d2[0] + d1[1] * d2[1]) / (Math.hypot(...d1) * Math.hypot(...d2) || 1)))) * 180 / Math.PI;
       label(ctx, `front knee ${angle.toFixed(0)}°`, kn[0] + (dir > 0 ? 1 : -1) * (R + 14 * u), kn[1], col, u, dir > 0 ? "left" : "right");
-    } else if (a.t === "headPath" || a.t === "hipPath") {
+    } else if (a.t === "joint") {
+      const p1 = kp[a.a], p2 = kp[a.b], p3 = kp[a.c];
+      ctx.strokeStyle = col; ctx.lineWidth = 7 * u; ctx.beginPath(); ctx.moveTo(p1[0], p1[1]); ctx.lineTo(p2[0], p2[1]); ctx.lineTo(p3[0], p3[1]); ctx.stroke();
+      const d1 = [p1[0] - p2[0], p1[1] - p2[1]], d2 = [p3[0] - p2[0], p3[1] - p2[1]];
+      const angle = Math.acos(Math.max(-1, Math.min(1, (d1[0] * d2[0] + d1[1] * d2[1]) / (Math.hypot(...d1) * Math.hypot(...d2) || 1)))) * 180 / Math.PI;
+      ctx.lineWidth = 4 * u; ctx.beginPath(); ctx.arc(p2[0], p2[1], R * 0.8, 0, 7); ctx.stroke();
+      label(ctx, `${a.text} ${angle.toFixed(0)}°`, p2[0] + (dir > 0 ? 1 : -1) * (R + 14 * u), p2[1], col, u, dir > 0 ? "left" : "right");
+    } else if (a.t === "balanceLine") {
+      const fa = kp[S.g.an], ba = kp[S.t.an], hd = kp[0];
+      const gy = Math.max(fa[1], ba[1]) + 18 * u;
+      ctx.strokeStyle = C.target; ctx.lineWidth = 6 * u; ctx.beginPath(); ctx.moveTo(fa[0], gy); ctx.lineTo(ba[0], gy); ctx.stroke();
+      for (const x of [fa[0], ba[0]]) { ctx.beginPath(); ctx.moveTo(x, gy - 14 * u); ctx.lineTo(x, gy + 14 * u); ctx.stroke() }
+      ctx.strokeStyle = col; ctx.lineWidth = 4 * u; ctx.setLineDash([9 * u, 8 * u]); ctx.beginPath(); ctx.moveTo(hd[0], hd[1]); ctx.lineTo(hd[0], gy); ctx.stroke(); ctx.setLineDash([]);
+      ctx.fillStyle = col; ctx.beginPath(); ctx.arc(hd[0], hd[1], 9 * u, 0, 7); ctx.fill();
+      label(ctx, "base", (fa[0] + ba[0]) / 2, gy + 40 * u, C.target, u, "center");
+    } else if (a.t === "swingStride") {
+      if (!c.map || !c.sm) continue;
+      const a0 = c.map(c.sm[a.from][S.g.an]), a1 = kp[S.g.an], y = Math.max(a0[1], a1[1]) + 26 * u;
+      ctx.strokeStyle = C.target; ctx.lineWidth = 5 * u; ctx.setLineDash([12 * u, 9 * u]); ctx.beginPath(); ctx.moveTo(a0[0], y); ctx.lineTo(a1[0], y); ctx.stroke(); ctx.setLineDash([]);
+      ctx.fillStyle = C.target; ctx.beginPath(); ctx.arc(a0[0], y, 7 * u, 0, 7); ctx.fill();
+      label(ctx, "stride", (a0[0] + a1[0]) / 2, y + 40 * u, col, u, "center");
+    } else if (a.t === "seq") {
+      const hl = [kp[11], kp[12]], sl = [kp[5], kp[6]];
+      ctx.lineWidth = 7 * u; ctx.strokeStyle = "#8fbaff"; ctx.beginPath(); ctx.moveTo(hl[0][0], hl[0][1]); ctx.lineTo(hl[1][0], hl[1][1]); ctx.stroke();
+      ctx.strokeStyle = col; ctx.beginPath(); ctx.moveTo(sl[0][0], sl[0][1]); ctx.lineTo(sl[1][0], sl[1][1]); ctx.stroke();
+      const lead = (a.ss - a.hs) / FPS;
+      label(ctx, "hips", Math.max(hl[0][0], hl[1][0]) + 14 * u, (hl[0][1] + hl[1][1]) / 2, "#8fbaff", u, "left");
+      label(ctx, lead >= 0 ? `shoulders turn ${lead.toFixed(2)} s after hips` : `shoulders turn ${(-lead).toFixed(2)} s before hips`, Math.max(sl[0][0], sl[1][0]) + 14 * u, (sl[0][1] + sl[1][1]) / 2 - 30 * u, col, u, "left");
+    } else if (a.t === "headPath" || a.t === "hipPath" || a.t === "handsPath") {
       if (!c.map || !c.sm) continue;
       const pts = [];
       for (let i = a.from; i <= a.to; i++) {
         const f = c.sm[i]; let q;
         if (a.t === "hipPath") q = mid(f[11], f[12]);
+        else if (a.t === "handsPath") q = mid(f[9], f[10]);
         else { const hs = [0, 1, 2, 3, 4].map((j) => f[j]).filter((z) => z[2] > 0.25); const zz = hs.length ? hs : [f[0]]; q = [zz.reduce((t, z) => t + z[0], 0) / zz.length, zz.reduce((t, z) => t + z[1], 0) / zz.length] }
         pts.push(c.map(q));
       }
@@ -870,7 +1146,7 @@ function drawAnn(ctx, c, f, kp, u) {
       ctx.strokeStyle = col; ctx.lineWidth = 5 * u; ctx.beginPath(); pts.forEach((q, i) => i ? ctx.lineTo(q[0], q[1]) : ctx.moveTo(q[0], q[1])); ctx.stroke();
       ctx.fillStyle = col; for (const q of [pts[0], pts[pts.length - 1]]) { ctx.beginPath(); ctx.arc(q[0], q[1], 8 * u, 0, 7); ctx.fill() }
       const e = pts[pts.length - 1];
-      label(ctx, a.t === "hipPath" ? "hip path during the lift" : "head path", e[0] + 20 * u, e[1] - 34 * u, col, u, "left");
+      label(ctx, a.t === "hipPath" ? "hip path during the lift" : a.t === "handsPath" ? "hands path" : "head path", e[0] + 20 * u, e[1] - 34 * u, col, u, "left");
     } else if (a.t === "strideLine") {
       const back = kp[S.t.an], fa = c.map ? c.map([a.fx, 0]) : [kp[S.g.an][0], 0];
       ctx.strokeStyle = C.target; ctx.lineWidth = 4 * u; ctx.setLineDash([10 * u, 9 * u]); ctx.beginPath(); ctx.moveTo(back[0], back[1]); ctx.lineTo(back[0], back[1] - 2.2 * torso); ctx.stroke(); ctx.setLineDash([]);
@@ -893,8 +1169,9 @@ function drawAnn(ctx, c, f, kp, u) {
       label(ctx, `arm slot ≈ ${a.deg.toFixed(0)}°`, sh[0] + dx * 1.3 + Math.sign(dx || 1) * 14 * u, sh[1] + dy * 1.3, "#8fbaff", u, dx >= 0 ? "left" : "right");
     } else if (a.t === "tempo") {
       const nose = kp[0];
-      label(ctx, `lift → foot strike ${a.tl.toFixed(2)} s`, nose[0], nose[1] - 120 * u, colOf(f.status), u, "center");
-      label(ctx, `foot strike → release ${a.tr.toFixed(2)} s`, nose[0], nose[1] - 76 * u, "rgba(230,235,245,.95)", u, "center");
+      const lb = a.labels || ["lift → foot strike", "foot strike → release"];
+      label(ctx, `${lb[0]} ${a.tl.toFixed(2)} s`, nose[0], nose[1] - 120 * u, colOf(f.status), u, "center");
+      label(ctx, `${lb[1]} ${a.tr.toFixed(2)} s`, nose[0], nose[1] - 76 * u, "rgba(230,235,245,.95)", u, "center");
     } else if (a.t === "legOut") {
       const hp = kp[S.t.hip], an = kp[S.t.an]; const d = dist(hp, an) || 1;
       const e = [an[0] + (an[0] - hp[0]) / d * 40 * u, an[1] + (an[1] - hp[1]) / d * 40 * u];
@@ -1007,23 +1284,27 @@ function stopPlay() { state.playing = false; video.pause(); cancelAnimationFrame
 async function showFrame(t) { stopPlay(); await seek(t); renderStage() }
 
 /* ---------------- UI wiring ---------------- */
-function addFiles(files) {
+function addFiles(files, kind = "pitch") {
   const before = state.clips.length, batch = Math.random().toString(36).slice(2);
   for (const file of files) {
     if (!/^video\//.test(file.type) && !/\.(mov|mp4|m4v|webm)$/i.test(file.name)) continue;
     state.clips.push({ id: Math.random().toString(36).slice(2), file, name: file.name.replace(/\.[^.]+$/, ""), url: URL.createObjectURL(file),
-      hand: "auto", view: "auto", t0: 0, t1: 0, status: "new", label: state.lastLabel, batch, autoLabel: true });
+      hand: "auto", view: "auto", t0: 0, t1: 0, status: "new", label: state.lastLabel, batch, autoLabel: true, kind });
   }
   if (state.clips.length === before) return;
   if (state.active < 0 || state.view === "clip") selectClip(state.active < 0 ? 0 : before); else { renderTabs(); renderCombined() }
 }
-const viewName = (c) => !c.findings ? "Not analyzed yet" : c.useView === "side" ? "Side view" : "Behind/front view";
-function groupKey(c) { return (c.label || "").trim().toLowerCase() }
+const isSwing = (c) => c.kind === "swing";
+const viewName = (c) => !c.findings ? "Not analyzed yet" : c.useView === "side" ? "Side view" : isSwing(c) ? "Pitcher/catcher view" : "Behind/front view";
+const KIND_WORD = { pitch: "Pitching", swing: "Hitting" };
+const MOMENTS = { pitch: { lift: "Leg lift", fs: "Foot strike", rel: "Release", fin: "Finish" }, swing: { lift: "Load", fs: "Foot plant", rel: "Contact", fin: "Finish" } };
+const MARKS = { pitch: { lift: "Lift", fs: "Strike", rel: "Release", fin: "Finish" }, swing: { lift: "Load", fs: "Plant", rel: "Contact", fin: "Finish" } };
+function groupKey(c) { return (c.kind || "pitch") + "|" + (c.label || "").trim().toLowerCase() }
 function groups() {
   const m = new Map();
   for (const c of state.clips) {
     const k = groupKey(c);
-    if (!m.has(k)) m.set(k, { key: k, name: (c.label || "").trim() || "Unnamed pitcher", clips: [] });
+    if (!m.has(k)) m.set(k, { key: k, kind: c.kind || "pitch", player: (c.label || "").trim() || "Unnamed player", name: `${(c.label || "").trim() || "Unnamed player"} · ${KIND_WORD[c.kind || "pitch"]}`, clips: [] });
     m.get(k).clips.push(c);
   }
   return [...m.values()];
@@ -1032,7 +1313,7 @@ function groupOf(c) { return groups().find((g) => g.key === groupKey(c)) }
 function renderTabs() {
   const box = $("clips");
   box.querySelectorAll(".clipTab").forEach((n) => n.remove());
-  const before = $("addBtn");
+  const before = $("addBtns");
   if (state.clips.length > 1) {
     const b = document.createElement("button"); b.type = "button"; b.className = "clipTab all"; b.setAttribute("role", "tab");
     b.setAttribute("aria-selected", state.view === "all" ? "true" : "false");
@@ -1043,11 +1324,11 @@ function renderTabs() {
     const b = document.createElement("button"); b.type = "button"; b.className = "clipTab"; b.setAttribute("role", "tab");
     b.setAttribute("aria-selected", state.view === "clip" && i === state.active ? "true" : "false");
     const dot = c.status === "done" ? "done" : c.status === "busy" ? "busy" : c.status === "error" ? "err" : "";
-    b.innerHTML = `<span class="dot ${dot}"></span><span class="nm">${esc(c.label ? c.label + " · " + c.name : c.name)}</span>`;
+    b.innerHTML = `<span class="dot ${dot}"></span><span class="kind">${isSwing(c) ? "Swing" : "Pitch"}</span><span class="nm">${esc(c.label ? c.label + " · " + c.name : c.name)}</span>`;
     b.onclick = () => selectClip(i);
     box.insertBefore(b, before);
   });
-  $("empty").hidden = state.clips.length > 0; $("addBtn").hidden = state.clips.length === 0;
+  $("empty").hidden = state.clips.length > 0; $("addBtns").hidden = state.clips.length === 0;
   $("workbench").hidden = state.clips.length === 0 || state.view === "all";
   $("combined").hidden = state.clips.length === 0 || state.view !== "all";
 }
@@ -1066,7 +1347,10 @@ async function selectClip(i) {
     stage.width = Math.round(c.W * k); stage.height = Math.round(c.H * k);
     $("nameIn").value = c.label; $("handSel").value = c.hand; $("viewSel").value = c.view;
     $("t0In").value = fmt(c.t0); $("t1In").value = fmt(c.t1); $("t1In").max = $("t0In").max = fmt(c.duration);
-    $("stageLabel").textContent = c.name;
+    $("stageLabel").textContent = `${KIND_WORD[c.kind || "pitch"]} · ${c.name}`;
+    $("handLbl").textContent = isSwing(c) ? "Batting side" : "Throwing hand";
+    $("viewSideOpt").textContent = isSwing(c) ? "Side (facing the hitter)" : "Side (1st or 3rd base)";
+    $("viewBehindOpt").textContent = isSwing(c) ? "From the pitcher or catcher" : "Behind or in front";
     if (c.duration > 20 && !c.sm) $("stageStatus").textContent = `This clip is ${fmt(c.duration)} s long. Set "Analyze from" and "to" around the pitch (up to about 10 s) to keep it quick.`;
     await seek(c.events ? c.fs0 + c.events.fs / FPS : Math.min(c.duration / 2, 0.5));
     renderStage(); renderMarkers(); renderReport(); updateOptionLabels();
@@ -1076,12 +1360,12 @@ function selectAll() { stopPlay(); state.view = "all"; renderTabs(); renderCombi
 function updateOptionLabels() {
   const c = clip(); if (!c) return;
   $("handSel").options[0].textContent = c.autoHand ? `Auto (${c.autoHand === "R" ? "right" : "left"})` : "Auto";
-  $("viewSel").options[0].textContent = c.autoView ? `Auto (${c.autoView === "side" ? "side" : "behind or front"})` : "Auto";
+  $("viewSel").options[0].textContent = c.autoView ? `Auto (${c.autoView === "side" ? "side" : isSwing(c) ? "pitcher or catcher view" : "behind or front"})` : "Auto";
 }
 function renderMarkers() {
   const c = clip(), box = $("markers"); box.innerHTML = "";
   if (!c || !c.events) return;
-  const names = { lift: "Lift", fs: "Strike", rel: "Release", fin: "Finish" };
+  const names = MARKS[c.kind || "pitch"];
   for (const k of ["lift", "fs", "rel", "fin"]) {
     const t = c.fs0 + c.events[k] / FPS; const b = document.createElement("b");
     b.style.left = (t / c.duration * 100) + "%"; b.style.top = (k === "fs" || k === "fin" ? 16 : 0) + "px"; b.textContent = "▲ " + names[k]; box.appendChild(b);
@@ -1097,7 +1381,7 @@ function renderReport() {
   }
   const n = { fix: 0, watch: 0, good: 0 }; c.findings.forEach((f) => n[f.status]++);
   tally.innerHTML = ["fix", "watch", "good"].filter((k) => n[k]).map((k) => `<span class="pill ${k}">${n[k]} ${k === "fix" ? "to fix" : k === "watch" ? "to watch" : "good"}</span>`).join("");
-  const ev = c.events; const label = { lift: "Leg lift", fs: "Foot strike", rel: "Release", fin: "Finish" };
+  const ev = c.events; const label = MOMENTS[c.kind || "pitch"];
   const chips = ["lift", "fs", "rel", "fin"].map((k) => `<div class="chip" data-ev="${k}" role="button" tabindex="0" aria-label="Go to ${label[k]}">
     <span class="k">${label[k]}</span><span class="v">${fmt(c.fs0 + ev[k] / FPS)} s</span>
     <span class="nudge"><span data-nudge="-1" aria-label="Earlier">◀</span><span data-nudge="1" aria-label="Later">▶</span></span></div>`).join("");
@@ -1108,7 +1392,7 @@ function renderReport() {
       ${(f.drills || []).map((d) => { const D = DRILLS[d]; return `<details class="drill"><summary>${esc(D.name)} <span class="meas">· ${esc(doseOf(d, f.level))}</span></summary><ol>${D.steps.map((s) => `<li>${esc(s)}</li>`).join("")}</ol><div class="cue">Cue: "${esc(D.cue)}"</div></details>` }).join("")}
     </div>`).join("");
   body.innerHTML = `<p class="eyebrow" style="margin-top:12px">Key moments · tap to view, ◀ ▶ to adjust</p><div class="moments">${chips}</div>
-    <p class="eyebrow">Checks · ${c.useHand === "R" ? "right-handed" : "left-handed"} pitcher, ${c.useView === "side" ? "side view" : "behind or front view"}</p>
+    <p class="eyebrow">Checks · ${c.useHand === "R" ? "right-handed" : "left-handed"} ${isSwing(c) ? "hitter" : "pitcher"}, ${viewName(c).toLowerCase()}</p>
     <div class="findings">${items}</div>
     <div class="actions">
       <button class="btn primary" id="exportBtn" type="button">Export annotated video (MP4)</button>
@@ -1117,7 +1401,7 @@ function renderReport() {
     </div>
     <p class="status" id="exportStatus" role="status"></p>
     <textarea id="planText" hidden readonly aria-label="Drill plan text"></textarea>
-    <p class="note">${c.useView === "side" ? "Side views can't see falling off toward 1st base. Add a clip from behind to check direction." : "Behind or front views can't measure stride length or arm timing. Add a side-view clip to check those."}</p>
+    <p class="note">${isSwing(c) ? (c.useView === "side" ? "Side views measure the most for hitters. Add a clip from the pitcher or catcher to check whether the head pulls off." : "Views from the pitcher or catcher can't measure stride, sequence, front leg or extension. Add a side-view clip facing the hitter.") : c.useView === "side" ? "Side views can't see falling off toward 1st base. Add a clip from behind to check direction." : "Behind or front views can't measure stride length or arm timing. Add a side-view clip to check those."}</p>
     ${groupOf(c).clips.length > 1 ? `<p class="note">This is one of ${groupOf(c).clips.length} clips for ${esc(groupOf(c).name)}. <button class="linkish" type="button" data-combined>See the combined report and drill plan</button></p>` : ""}`;
   body.querySelectorAll(".chip").forEach((el) => {
     const go = (e) => {
@@ -1201,16 +1485,24 @@ const CHECKS = {
   tempo: { name: "Tempo", need: "any" }, balance: { name: "Balance at the top", need: "any" },
   slot: { name: "Arm slot", need: "behind" }
 };
+const SCHECKS = {
+  sHead: { name: "Head movement", need: "any" }, sHands: { name: "Hand path before the swing", need: "any" },
+  sSeq: { name: "Hips before shoulders", need: "sideH" }, sFrontLeg: { name: "Front leg at contact", need: "sideH" },
+  sExtend: { name: "Extension through contact", need: "sideH" }, sStride: { name: "Stride length", need: "sideH" },
+  sBalance: { name: "Balance in the load", need: "sideH" }, sFinish: { name: "Balanced finish", need: "any" },
+  sTiming: { name: "Swing timing", need: "any" }
+};
+const ckOf = (kind) => kind === "swing" ? SCHECKS : CHECKS;
 const RANK = { fix: 2, watch: 1, good: 0 };
 function combine(g) {
   const done = g.clips.filter((c) => c.findings);
   const map = new Map();
   for (const c of done) for (const f of c.findings) {
-    if (!map.has(f.id)) map.set(f.id, { id: f.id, name: (CHECKS[f.id] || {}).name || f.title, ev: [], worst: null });
+    if (!map.has(f.id)) map.set(f.id, { id: f.id, name: (ckOf(g.kind)[f.id] || {}).name || f.title, ev: [], worst: null });
     const e = map.get(f.id); e.ev.push({ c, f });
     if (!e.worst || RANK[f.status] > RANK[e.worst.status]) e.worst = f;
   }
-  const order = Object.keys(CHECKS);
+  const order = Object.keys(ckOf(g.kind));
   const checks = [...map.values()].map((e) => ({ ...e, status: e.worst.status, score: e.ev.reduce((s, x) => s + RANK[x.f.status], 0), flaggedIn: e.ev.filter((x) => x.f.status !== "good") }))
     .sort((a, b) => RANK[b.status] - RANK[a.status] || b.score - a.score || order.indexOf(a.id) - order.indexOf(b.id));
   // consistency between clips filmed from the same kind of angle
@@ -1226,9 +1518,15 @@ function combine(g) {
         : `${label} ranges from ${fmtV(lo)}${unit} to ${fmtV(hi)}${unit} across these clips. A delivery that changes pitch to pitch is hard to command. Work on repeating one version of it.` };
     cons.push({ id: "cons_" + id, name: label + " consistency", ev, worst, status: st, score: RANK[st], flaggedIn: st === "good" ? [] : ev.map((x) => ({ c: x.c, f: { ...x.f, drills, level: worst.level } })) });
   };
-  addCons("stride", "Stride length", (c) => c.strideR != null ? c.strideR * 100 : null, "% of height", (v) => v.toFixed(0), 8, ["strideTape", "boxLanding"], "side");
-  addCons("tempo", "Tempo", (c) => c.tempo, " s", (v) => v.toFixed(2), 0.15, ["rhythmCount"], null);
-  addCons("slot", "Arm slot", (c) => c.slot, "°", (v) => v.toFixed(0), 12, ["slotRepeat"], "behind");
+  if (g.kind === "swing") {
+    addCons("sStride", "Stride length", (c) => c.strideR != null ? c.strideR * 100 : null, "% of height", (v) => v.toFixed(0), 8, ["hStrideHold", "hRepeat"], "side");
+    addCons("sTiming", "Foot plant to contact time", (c) => c.tempo, " s", (v) => v.toFixed(2), 0.08, ["hRepeat"], null);
+    addCons("sHead", "Head movement", (c) => c.headMove, " torso-lengths", (v) => v.toFixed(2), 0.25, ["hHeadTee", "hRepeat"], null);
+  } else {
+    addCons("stride", "Stride length", (c) => c.strideR != null ? c.strideR * 100 : null, "% of height", (v) => v.toFixed(0), 8, ["strideTape", "boxLanding"], "side");
+    addCons("tempo", "Tempo", (c) => c.tempo, " s", (v) => v.toFixed(2), 0.15, ["rhythmCount"], null);
+    addCons("slot", "Arm slot", (c) => c.slot, "°", (v) => v.toFixed(0), 12, ["slotRepeat"], "behind");
+  }
   checks.push(...cons); checks.sort((a, b) => RANK[b.status] - RANK[a.status] || b.score - a.score);
   const flagged = checks.filter((e) => e.status !== "good"), keep = checks.filter((e) => e.status === "good" && !e.worst.info);
   const plan = new Map();
@@ -1245,7 +1543,7 @@ function combine(g) {
   const notChecked = order.filter((id) => !map.has(id));
   return { done, checks, flagged, keep, plan: planList, notChecked };
 }
-const NEED_MSG = { side: "needs a side view (1st- or 3rd-base side)", behind: "needs a view from behind (center field)" };
+const NEED_MSG = { side: "needs a side view (1st- or 3rd-base side)", behind: "needs a view from behind (center field)", sideH: "needs a side view facing the hitter" };
 function renderCombined() {
   const root = $("combined");
   const gs = groups();
@@ -1260,7 +1558,7 @@ function renderCombined() {
         <p>${esc(e.worst.body)}</p>
         ${e.ev.map((x, xi) => `<button type="button" class="evrow" data-g="${gi}" data-c="${state.clips.indexOf(x.c)}" data-fr="${x.f.frame}" data-id="${x.f.id}"><span class="pill sm ${x.f.status}">${x.f.status}</span><span class="src">${esc(viewName(x.c))} · ${esc(x.c.name)}</span><span class="meas">${esc(x.f.meas)}</span></button>`).join("")}
       </div>`).join("");
-    const nc = R.done.length ? R.notChecked.map((id) => `${CHECKS[id].name} ${NEED_MSG[CHECKS[id].need] || ""}`) : [];
+    const CK = ckOf(g.kind); const nc = R.done.length ? R.notChecked.map((id) => `${CK[id].name} ${NEED_MSG[CK[id].need] || ""}`) : [];
     return `<div class="card combo" data-gi="${gi}">
       <div class="reportHead"><h2>${esc(g.name)}</h2><div class="tally">${["fix", "watch", "good"].filter((k) => n[k]).map((k) => `<span class="pill ${k}">${n[k]} ${k === "fix" ? "to fix" : k === "watch" ? "to watch" : "good"}</span>`).join("")}</div></div>
       <p class="note" style="margin:2px 0 0">Combined from ${R.done.length} analyzed clip${R.done.length === 1 ? "" : "s"}${pending ? `, ${pending} still to analyze` : ""}. Each check takes the clearest angle for it, and the worst result across angles sets its status.</p>
@@ -1312,7 +1610,7 @@ async function pickCodec(W, H, bitrate) {
   }
   return null;
 }
-const subOf = (c) => `${c.useHand === "R" ? "Right" : "Left"}-handed · ${c.useView === "side" ? "side view" : "behind/front view"} · ${c.name}`;
+const subOf = (c) => `${c.useHand === "R" ? "Right" : "Left"}-handed ${isSwing(c) ? "hitter" : "pitcher"} · ${viewName(c).toLowerCase()} · ${c.name}`;
 /* real-speed pass, then slow motion with a freeze-frame callout at each finding */
 async function renderClip(c, ctx, W, H, emit, prog) {
   await setVideo(c);
@@ -1455,7 +1753,7 @@ async function exportClips(clips, single, g, stEl, btnEl) {
       items = R.flagged.map((e) => ({ title: e.worst.title, status: e.status,
         detail: `${[...new Set(e.flaggedIn.flatMap((x) => x.f.drills))].map((d) => DRILLS[d].name).join(", ")} (seen in ${[...new Set(e.flaggedIn.map((x) => viewName(x.c).toLowerCase()))].join(" and ")})` }));
       keep = R.keep.map((e) => e.worst.title).join(" · ");
-      filename = `${safeName(g.name === "Unnamed pitcher" ? "Combined" : g.name)}_all_angles.mp4`;
+      filename = `${safeName(g.player === "Unnamed player" ? `Combined ${KIND_WORD[g.kind]}` : g.name)}_all_angles.mp4`;
       await backdrop(ctx, W, H, clips[clips.length - 1], clips[clips.length - 1].events.fin);
     }
     drawSummaryCard(ctx, W, H, title, sub, items, keep);
@@ -1500,11 +1798,11 @@ function planModelClip(c) {
     if (LV[f.level] > LV[p.level]) p.level = f.level; p.rank += RANK[f.status] * (1 + LV[f.level]);
   }
   const pl = [...plan.values()].sort((a, b) => b.rank - a.rank); pl.forEach((p, i) => { p.startHere = i < 2 && p.level !== "light" });
-  return { name: c.label || c.name, sub: `${viewName(c)} · ${c.name} · ${c.useHand === "R" ? "right" : "left"}-handed`,
+  return { name: `${c.label || c.name} · ${KIND_WORD[c.kind || "pitch"]}`, sub: `${viewName(c)} · ${c.name} · ${c.useHand === "R" ? "right" : "left"}-handed ${isSwing(c) ? "hitter" : "pitcher"}`,
     issues: flagged.map((f) => ({ title: f.title, status: f.status, body: f.body, ev: [`${f.moment}: ${f.meas}`] })),
     plan: pl, keep: c.sorted.filter((f) => f.status === "good" && !f.info).map((f) => f.title),
     notes: c.sorted.filter((f) => f.info).map((f) => `${f.title} (${f.meas})`),
-    notChecked: Object.keys(CHECKS).filter((id) => !c.findings.some((f) => f.id === id)).map((id) => `${CHECKS[id].name}: ${NEED_MSG[CHECKS[id].need] || "not measured"}`) };
+    notChecked: Object.entries(ckOf(c.kind)).filter(([id]) => !c.findings.some((f) => f.id === id)).map(([, k]) => `${k.name}: ${NEED_MSG[k.need] || "not measured"}`) };
 }
 function planModelGroup(g) {
   const R = combine(g);
@@ -1512,7 +1810,7 @@ function planModelGroup(g) {
     issues: R.flagged.map((e) => ({ title: e.worst.title, status: e.status, body: e.worst.body, ev: e.ev.map((x) => `${viewName(x.c)}, ${x.c.name}: ${x.f.status}, ${x.f.meas}`) })),
     plan: R.plan, keep: R.keep.map((e) => e.worst.title),
     notes: R.checks.filter((e) => e.worst.info).flatMap((e) => e.ev.map((x) => `${x.f.title} (${viewName(x.c)}, ${x.c.name})`)),
-    notChecked: R.notChecked.map((id) => `${CHECKS[id].name}: ${NEED_MSG[CHECKS[id].need] || "not measured"}`) };
+    notChecked: R.notChecked.map((id) => `${ckOf(g.kind)[id].name}: ${NEED_MSG[ckOf(g.kind)[id].need] || "not measured"}`) };
 }
 function modelText(m) {
   const L = [`${m.name}: practice plan (Mound Check)`, m.sub, ""];
@@ -1604,11 +1902,11 @@ function copyText(text, st, ta) {
 }
 
 /* ---------------- events ---------------- */
-$("fileIn").addEventListener("change", (e) => { addFiles([...e.target.files]); e.target.value = "" });
-const dz = document.body;
-dz.addEventListener("dragover", (e) => { e.preventDefault(); $("empty").classList.add("over") });
-dz.addEventListener("dragleave", (e) => { if (e.target === dz || e.target === $("empty")) $("empty").classList.remove("over") });
-dz.addEventListener("drop", (e) => { e.preventDefault(); $("empty").classList.remove("over"); addFiles([...(e.dataTransfer.files || [])]) });
+$("fileIn").addEventListener("change", (e) => { addFiles([...e.target.files], "pitch"); e.target.value = "" });
+$("fileInBat").addEventListener("change", (e) => { addFiles([...e.target.files], "swing"); e.target.value = "" });
+// files come in through the pitching or batting button only, so every clip is analyzed with the right criteria
+document.body.addEventListener("dragover", (e) => e.preventDefault());
+document.body.addEventListener("drop", (e) => e.preventDefault());
 $("playBtn").onclick = async () => {
   const c = clip(); if (!c) return;
   if (state.playing) { stopPlay(); return }
