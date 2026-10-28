@@ -244,6 +244,7 @@ textarea.planText, textarea#planText { width: 100%; min-height: 160px; font: .85
 
 <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.22.0/dist/tf.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/mp4-muxer@5.2.2/build/mp4-muxer.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script>
 (() => {
 "use strict";
@@ -254,54 +255,96 @@ const C = { fix: "#ff5a52", watch: "#ffc93f", good: "#46d98a", target: "#ffd23f"
 
 /* ---------------- drill library ---------------- */
 const DRILLS = {
-  gloveHolds: { name: "Glove-to-Chest Stride Holds", reps: "No ball, 2 sets of 8",
+  gloveHolds: { dose: ["1 set of 8", "2 sets of 8", "3 sets of 8, every practice"], name: "Glove-to-Chest Stride Holds", reps: "No ball, 2 sets of 8",
     steps: ["Start in the stride position: feet at full stride length, front foot pointed at the target.",
             "Extend the glove out front at chest height, thumb down, pointed at the catcher.",
             "Rotate the chest forward to the glove, then tuck the glove into the chest as the throwing arm comes through.",
             "Freeze for a 2-count at the end."], cue: "Chest to glove, not glove to hip." },
-  fence: { name: "Fence Glove Drill", reps: "With ball, 10 throws",
+  fence: { dose: ["8 throws", "10 throws", "15 throws, every bullpen"], name: "Fence Glove Drill", reps: "With ball, 10 throws",
     steps: ["Stand in the stride position with the glove side a few inches from a fence, net or wall.",
             "Throw to a partner down the line. If the glove flies out behind, it hits the fence.",
             "Start at half speed and build to about 75%."], cue: "Glove stays in the window." },
-  targetLine: { name: "Target Line Drill", reps: "10 to 15 throws",
+  targetLine: { dose: ["8 throws", "10 to 15 throws", "15 throws, every bullpen"], name: "Target Line Drill", reps: "10 to 15 throws",
     steps: ["Chalk or tape a straight line from the middle of the rubber toward the plate.",
             "Front foot lands on or just closed of the line.",
             "Back foot finishes on or near the line, not out toward the arm side.",
             "Check the foot marks after every few throws."], cue: "Everything goes to the catcher." },
-  pickUp: { name: "Pick-Up Drill", reps: "10 throws",
+  pickUp: { dose: ["8 throws", "10 throws", "15 throws, every bullpen"], name: "Pick-Up Drill", reps: "10 throws",
     steps: ["Place a ball or towel about a foot in front of and slightly outside the landing foot.",
             "After each throw, let the throwing hand finish down and pick it up.",
             "This makes the chest finish out over the front knee instead of standing up."], cue: "Finish low, finish long." },
-  towel: { name: "Towel Drill", reps: "2 sets of 10",
+  towel: { dose: ["1 set of 10", "2 sets of 10", "3 sets of 10, every practice"], name: "Towel Drill", reps: "2 sets of 10",
     steps: ["Hold a hand towel by the end in the throwing hand.",
             "Do a full delivery and snap the towel at a glove held by a partner about one long stride past the landing foot.",
             "Hitting the glove means good extension and a finish over the front leg."], cue: "Reach the target." },
-  holdFinish: { name: "Hold-the-Finish", reps: "Every bullpen pitch",
+  holdFinish: { dose: ["Last 5 pitches of each bullpen", "Every bullpen pitch", "Every pitch, bullpen and catch"], name: "Hold-the-Finish", reps: "Every bullpen pitch",
     steps: ["After each pitch, hold the finish for a 2-count.",
             "Chest over the front knee, glove tucked, weight on the front leg.",
             "If he can't hold it, he fell off. Note it and reset."], cue: "Stick the landing." },
-  hipLead: { name: "Hip-Lead (Hershiser) Drill", reps: "2 sets of 8",
+  hipLead: { dose: ["1 set of 8", "2 sets of 8", "3 sets of 8, every practice"], name: "Hip-Lead (Hershiser) Drill", reps: "2 sets of 8",
     steps: ["From the balance point, lead with the front hip toward the target before the front foot moves forward.",
             "Keep the front shoulder closed and the hands together as long as possible.",
             "Let the stride happen as a controlled fall toward the plate, then land and throw softly."], cue: "Hip goes first, foot follows." },
-  strideTape: { name: "Stride-to-Tape", reps: "10 throws",
+  strideTape: { dose: ["8 throws", "10 throws", "15 throws, every bullpen"], name: "Stride-to-Tape", reps: "10 throws",
     steps: ["Measure his height and put a strip of tape at 80% of that distance from the rubber.",
             "Stride to the tape. Once that feels easy, move it out a few inches.",
             "Land on a slightly bent front knee, toe pointed at the target, not on the heel."], cue: "Land on the tape, toe to target." },
-  powerPos: { name: "Power Position Throws", reps: "2 sets of 8",
+  powerPos: { dose: ["1 set of 8", "2 sets of 8", "3 sets of 8, every practice"], name: "Power Position Throws", reps: "2 sets of 8",
     steps: ["Start at foot strike: feet at stride length, glove out front, throwing hand up above the shoulder with the ball facing away.",
             "Throw from there with only the hips and chest rotating.",
             "This teaches where the arm should be when the front foot lands."], cue: "Foot down, ball up." },
-  handBreak: { name: "Down, Back, Up Rhythm", reps: "10 dry reps, then 10 throws",
+  handBreak: { dose: ["5 dry reps, then 5 throws", "10 dry reps, then 10 throws", "15 dry reps, then 15 throws, daily"], name: "Down, Back, Up Rhythm", reps: "10 dry reps, then 10 throws",
     steps: ["Break the hands as the leg starts down from the lift.",
             "Say \"down, back, up\" as the throwing arm swings down, back and up.",
             "The ball should reach \"up\" as the front foot touches the ground."], cue: "Break early, arm up on time." },
-  balanceHold: { name: "Balance Point Holds", reps: "2 sets of 8",
+  legBlock: { dose: ["1 set of 8", "2 sets of 8", "3 sets of 8, every practice"], name: "Lead-Leg Block Throws", reps: "2 sets of 8",
+    steps: ["Start in the stride position with the front knee slightly bent and the glove out front.",
+            "Throw at half speed. As the arm comes through, push the front foot into the ground so the knee straightens.",
+            "Finish with the chest over a firm front leg. The front knee should end straighter than it landed, not more bent."], cue: "Land soft, then post up." },
+  strideStick: { dose: ["5 reps", "8 reps", "2 sets of 8, every practice"], name: "Stride and Stick", reps: "8 reps",
+    steps: ["From the balance point, stride to his normal landing spot without throwing.",
+            "Stick the landing on a slightly bent, firm front leg and freeze for 3 seconds.",
+            "If the knee keeps sinking or wobbles, shorten the stride a little until he can hold it."], cue: "Stick it like a gymnast." },
+  mirrorHead: { dose: ["5 dry reps", "10 dry reps", "2 sets of 10, daily"], name: "Mirror Head Drill", reps: "10 dry reps",
+    steps: ["Set up sideways to a mirror or window, or film from behind on a phone.",
+            "Go through the leg lift and stride slowly without a ball, watching the head.",
+            "The head should move smoothly down and toward the target, never up or sideways. Repeat until it stays level."], cue: "Eyes level, head to the target." },
+  boxLanding: { dose: ["8 throws", "10 throws", "15 throws, every bullpen"], name: "Landing Box Drill", reps: "10 throws",
+    steps: ["Draw or tape a box about the size of a shoe where the front foot should land: on the line to the plate, at about 80% of his height from the rubber.",
+            "Throw at half to three-quarter speed and check where the foot lands each time.",
+            "Move the box slightly closed or open as needed until he lands in it most of the time."], cue: "Land in the box." },
+  chestOverKnee: { dose: ["1 set of 8", "2 sets of 8", "3 sets of 8, every practice"], name: "Chest-Over-Knee Throws", reps: "2 sets of 8",
+    steps: ["Start in the stride position, front knee bent and firm.",
+            "Throw at half speed and let the chest bow forward over the front knee as the ball comes out.",
+            "Freeze at the end. The throwing shoulder should be out over the front knee."], cue: "Nose over the front toe." },
+  postureHolds: { dose: ["5 reps", "8 reps", "2 sets of 8, every practice"], name: "Posture Holds at Release", reps: "8 reps",
+    steps: ["Without a ball, move slowly into the release position and freeze.",
+            "Check from behind: head over the front knee, glove-side shoulder only slightly lower than the throwing shoulder.",
+            "Then make easy throws keeping that same tilt instead of falling to the glove side."], cue: "Stay stacked, don't fall over." },
+  footballThrows: { dose: ["8 throws", "10 throws", "15 throws, twice a week"], name: "Football Throws", reps: "10 throws",
+    steps: ["Play catch with a junior-size football at 30 to 45 feet.",
+            "A football only spirals with a clean arm path: elbow at shoulder height, hand on top of the ball.",
+            "Follow with 5 baseball throws using the same arm feel."], cue: "Make it spiral." },
+  rhythmCount: { dose: ["5 dry reps, then 5 throws", "10 dry reps, then 10 throws", "15 dry reps, then 15 throws, daily"], name: "Rhythm Count Drill", reps: "10 dry reps, then 10 throws",
+    steps: ["Count \"one\" at the start of the leg lift, \"two\" at the top, \"three\" as the front foot lands.",
+            "Keep the beats even. Use a slow count if he rushes, a quicker count if he drifts.",
+            "Once it's even dry, add the ball and keep the same count."], cue: "One, two, three." },
+  liftPause: { dose: ["1 set of 8", "2 sets of 8", "3 sets of 8, every practice"], name: "Lift-and-Pause Drill", reps: "2 sets of 8",
+    steps: ["Lift the leg to the top and pause for a 2-count with the hips over the back foot.",
+            "Only after the pause, lead with the front hip toward the plate and throw.",
+            "Gradually shorten the pause until it's a smooth move with no early slide."], cue: "Get to the top, then go." },
+  slotRepeat: { dose: ["10 throws", "15 throws", "20 throws, every bullpen"], name: "Slot Repeat Drill", reps: "15 throws",
+    steps: ["Have a partner stand behind him and watch the throwing hand at release.",
+            "Throw at three-quarter speed. After each throw the partner says \"same\" or \"different\".",
+            "Aim for 8 \"same\" calls in a row before adding speed."], cue: "Same window every time." },
+  balanceHold: { dose: ["1 set of 8", "2 sets of 8", "3 sets of 8, every practice"], name: "Balance Point Holds", reps: "2 sets of 8",
     steps: ["Lift the leg to the balance point and hold for a 3-count.",
             "Head stays stacked over the back foot, chest tall, no lean toward the plate or 1st base.",
             "Then deliver at half speed without losing that posture."], cue: "Tall and still at the top." }
 };
 
+const LEVEL_IX = { light: 0, standard: 1, heavy: 2 };
+const doseOf = (d, level) => { const D = DRILLS[d]; return D.dose ? D.dose[LEVEL_IX[level] ?? 1] : D.reps };
 /* ---------------- state ---------------- */
 const state = { clips: [], active: -1, view: "clip", lastLabel: "", model: null, modelPromise: null, tapping: false, playing: false, raf: 0, busy: false };
 const stage = $("stage"), sctx = stage.getContext("2d");
@@ -500,7 +543,7 @@ function analyze(c) {
     const toward = view === "side" ? (Math.sign(s[0] - h[0]) === dir ? "toward the plate" : "away from the plate") : "to the side";
     const a = Math.abs(tilt);
     const st = a < 10 ? "good" : a < 18 ? "watch" : "fix";
-    F.push({ id: "balance", frame: lift, moment: "Leg lift", status: st,
+    F.push({ id: "balance", frame: lift, moment: "Leg lift", status: st, extreme: a >= 25,
       title: st === "good" ? "Balanced at the top" : "Leaning at the balance point",
       meas: `Trunk tilt ${a.toFixed(0)}°`,
       body: st === "good" ? "Head and chest stay stacked over the back foot at the top of the leg lift. Keep this."
@@ -511,11 +554,11 @@ function analyze(c) {
   // 2. glove at foot strike
   {
     const s = shm(fs), h = hpm(fs); const gw = K[fs][G.wr];
-    const g = (gw[1] - s[1]) / Math.max(1, h[1] - s[1]);
+    const g = (gw[1] - s[1]) / Math.max(1, h[1] - s[1]); c.gloveG = g;
     const st = g < 0.45 ? "good" : g < 0.65 ? "watch" : "fix";
     const gs = K[fs][G.sh];
     const ghost = view === "side" ? [gs[0] + dir * 0.6 * torso, gs[1] + 0.05 * torso] : [gs[0], gs[1] + 0.1 * torso];
-    F.push({ id: "gloveFS", frame: fs, moment: "Foot strike", status: st,
+    F.push({ id: "gloveFS", frame: fs, moment: "Foot strike", status: st, extreme: g >= 0.85,
       title: st === "good" ? "Glove out front at foot strike" : "Glove drops too early",
       meas: `Glove ${Math.round(Math.max(0, g) * 100)}% of the way from shoulders to hips`,
       body: st === "good" ? "The glove is still out front around chest height when the front foot lands, so the front side stays firm."
@@ -538,10 +581,11 @@ function analyze(c) {
       hl: up ? [] : [[Tt.sh, Tt.el], [Tt.el, Tt.wr]] });
   }
   // 4. stride (side view only)
+  c.strideR = view === "side" ? strideR : null; c.slot = null;
   if (view === "side") {
     const st = strideR >= 0.78 ? "good" : strideR >= 0.62 ? "watch" : "fix";
     const pctS = Math.round(strideR * 100);
-    F.push({ id: "stride", frame: fs, moment: "Foot strike", status: st,
+    F.push({ id: "stride", frame: fs, moment: "Foot strike", status: st, extreme: strideR < 0.55,
       title: st === "good" ? "Good stride length" : "Stride could be longer",
       meas: `Stride ≈ ${pctS}% of height`,
       body: st === "good" ? `Stride is about ${pctS}% of his height, a solid length that carries momentum to the plate.`
@@ -562,7 +606,7 @@ function analyze(c) {
     const frame = st === "good" ? E.fin : wi;
     const s = shm(frame);
     const tuck = view === "side" ? [s[0] + dir * 0.25 * torso, s[1] + 0.35 * torso] : [s[0], s[1] + 0.35 * torso];
-    F.push({ id: "gloveFin", frame, moment: "Finish", status: st,
+    F.push({ id: "gloveFin", frame, moment: "Finish", status: st, extreme: view === "side" ? worst < -0.7 : worst < -1.3,
       title: st === "good" ? "Glove stays in front through release" : (view === "side" ? "Glove flies out behind" : "Glove flies out to the side"),
       meas: view === "side" ? `Glove ${Math.abs(worst).toFixed(1)} torso-lengths ${worst < 0 ? "behind" : "ahead of"} the hips` : `Glove ${Math.abs(worst).toFixed(1)} torso-lengths out to the side`,
       body: st === "good" ? "After release the glove stays near the chest instead of flying away."
@@ -576,7 +620,7 @@ function analyze(c) {
     const fin = E.fin, s = shm(fin), fa = K[fin][G.an];
     const over = ((s[0] - fa[0]) * dir) / torso;
     const st = over > 0.2 ? "good" : over > 0 ? "watch" : "fix";
-    F.push({ id: "finish", frame: fin, moment: "Finish", status: st,
+    F.push({ id: "finish", frame: fin, moment: "Finish", status: st, extreme: over < -0.2,
       title: st === "good" ? "Finishes out over the front leg" : "Finishes upright, behind the front leg",
       meas: `Shoulders ${Math.abs(over).toFixed(1)} torso-lengths ${over >= 0 ? "past" : "behind"} the front foot`,
       body: st === "good" ? "The chest carries out past the front foot at the finish, so the energy goes to the plate."
@@ -587,7 +631,7 @@ function analyze(c) {
     let worst = 0, wi = rel;
     for (let i = rel; i <= end; i++) { const m = Math.abs(K[i][Tt.an][0] - K[i][G.an][0]) / torso; if (m > worst) { worst = m; wi = i } }
     const st = worst < 0.9 ? "good" : worst < 1.2 ? "watch" : "fix";
-    F.push({ id: "falloff", frame: st === "good" ? E.fin : wi, moment: "Finish", status: st,
+    F.push({ id: "falloff", frame: st === "good" ? E.fin : wi, moment: "Finish", status: st, extreme: worst > 1.6,
       title: st === "good" ? "Finishes on line to the plate" : "Falls off to the arm side",
       meas: `Back foot swings ${worst.toFixed(1)} torso-lengths out to the side`,
       body: st === "good" ? "The back leg comes through close to the target line, so the body stays on line to the catcher."
@@ -595,6 +639,141 @@ function analyze(c) {
       drills: st === "good" ? [] : ["targetLine", "pickUp"],
       ann: st === "good" ? [] : [{ t: "toCatcher" }, { t: "legOut", col: st }], hl: st === "good" ? [] : [[Tt.hip, Tt.kn], [Tt.kn, Tt.an]] });
   }
+
+  /* ---------- additional checks ---------- */
+  const ang3 = (a, b, cc) => { const v1 = [a[0] - b[0], a[1] - b[1]], v2 = [cc[0] - b[0], cc[1] - b[1]]; const d = Math.hypot(...v1) * Math.hypot(...v2) || 1; return Math.acos(Math.max(-1, Math.min(1, (v1[0] * v2[0] + v1[1] * v2[1]) / d))) * 180 / Math.PI };
+  const headPt = (i) => { const pts = [0, 1, 2, 3, 4].map((k) => K[i][k]).filter((q) => q[2] > 0.25); const q = pts.length ? pts : [K[i][0]]; return [q.reduce((t, x) => t + x[0], 0) / q.length, q.reduce((t, x) => t + x[1], 0) / q.length] };
+  const relW = [rel, Math.min(T - 1, rel + 4)];
+  const st3 = (bad, watchT, fixT, heavyT) => bad >= heavyT ? ["fix", true] : bad >= fixT ? ["fix", false] : bad >= watchT ? ["watch", false] : ["good", false];
+  // 8. front knee bracing through release (side view)
+  if (view === "side") {
+    const kFS = ang3(K[fs][G.hip], K[fs][G.kn], K[fs][G.an]);
+    let kMax = -1, kMaxAt = rel; for (let i = relW[0]; i <= relW[1]; i++) { const a = ang3(K[i][G.hip], K[i][G.kn], K[i][G.an]); if (a > kMax) { kMax = a; kMaxAt = i } }
+    const loss = kFS - kMax; // degrees the knee keeps bending after landing
+    const [st, ex] = st3(loss, 8, 18, 30);
+    F.push({ id: "kneeBrace", frame: st === "good" ? kMaxAt : rel, moment: "Release", status: st, extreme: ex,
+      title: st === "good" ? "Front leg firms up through release" : "Front knee collapses at release",
+      meas: `Knee ${kFS.toFixed(0)}° at landing → ${kMax.toFixed(0)}° at release`,
+      body: st === "good" ? "The front knee stops bending and starts to straighten as the ball comes out, which turns the stride's momentum into arm speed."
+        : `The front knee keeps bending after landing (about ${Math.max(0, loss).toFixed(0)}° more by release). A front leg that firms up, or "blocks", at release transfers energy up the body. A leg that keeps giving leaks it.`,
+      drills: st === "good" ? [] : ["legBlock", "strideStick"], ann: [{ t: "knee", col: st }], hl: st === "good" ? [] : [[G.hip, G.kn], [G.kn, G.an]] });
+  }
+  // 9. head stability
+  {
+    const h0 = headPt(lift); let rise = 0;
+    for (let i = lift; i <= fs; i++) rise = Math.max(rise, (h0[1] - headPt(i)[1]) / height);
+    let lat = 0, latAt = fs;
+    if (view !== "side") for (let i = lift; i <= rel; i++) { const m = Math.abs(headPt(i)[0] - h0[0]) / torso; if (m > lat) { lat = m; latAt = i } }
+    const bad = view === "side" ? rise / 0.04 : lat / 0.5; // scaled so 1 = watch threshold
+    const [st, ex] = st3(bad, 1, 1.6, 2.4);
+    F.push({ id: "head", frame: view === "side" ? fs : latAt, moment: "Stride", status: st, extreme: ex,
+      title: st === "good" ? "Head stays steady through the stride" : view === "side" ? "Head pops up during the stride" : "Head drifts sideways during the stride",
+      meas: view === "side" ? `Head rises ${(rise * 100).toFixed(0)}% of height after the lift` : `Head moves ${lat.toFixed(1)} torso-lengths sideways`,
+      body: st === "good" ? "The head travels smoothly toward the plate without bobbing or drifting sideways, which helps him see the target and repeat his release."
+        : view === "side" ? "The head lifts up after the leg lift instead of moving smoothly down and forward. Bobbing changes his eye level and release point from pitch to pitch."
+        : "The head drifts to the side during the stride instead of moving straight at the catcher. That pulls the body off line and makes the release point wander.",
+      drills: st === "good" ? [] : ["mirrorHead", "balanceHold"], ann: [{ t: "headPath", from: lift, to: view === "side" ? fs : rel, col: st }] });
+  }
+  // 10. stride direction (behind or front view)
+  if (view !== "side") {
+    const armSign = Math.sign(K[rel][Tt.sh][0] - K[rel][G.sh][0]) || 1;
+    const back = K[fs][Tt.an];
+    const xs = [];
+    for (let i = fs; i <= Math.min(T - 1, fs + 5); i++) { const fa = K[i][G.an]; if (Math.abs(fa[0] - K[i][Tt.an][0]) > 0.15 * torso || Math.abs(fa[1] - K[i][Tt.an][1]) > 0.15 * torso) xs.push(fa[0]) }
+    const fx = xs.length ? median(xs) : K[fs][G.kn][0];
+    const off = ((fx - back[0]) * armSign) / torso; // + = toward arm side (closed), - = toward glove side (open)
+    const bad = off > 0 ? off / 0.45 : -off / 0.35;
+    const [st, ex] = st3(bad, 1, 1.5, 2.2);
+    const kind = off > 0 ? "closed (across the body)" : "open (toward the glove side)";
+    F.push({ id: "strideDir", frame: Math.min(T - 1, fs + 2), moment: "Foot strike", status: st, extreme: ex,
+      title: st === "good" ? "Stride lands on line" : off > 0 ? "Stride lands closed" : "Stride lands open",
+      meas: `Front foot ${Math.abs(off).toFixed(2)} torso-lengths ${off > 0 ? "to the arm side" : "to the glove side"}`,
+      body: st === "good" ? "The front foot lands close to the line to the plate, so the hips can rotate fully and everything heads at the catcher."
+        : `The front foot lands ${kind}. ${off > 0 ? "A closed landing blocks the hips from turning, so he throws across his body and the arm has to do more work." : "An open landing lets the hips and shoulders fly open early, which costs velocity and pulls pitches to the glove side."}`,
+      drills: st === "good" ? [] : ["boxLanding", "targetLine"], ann: [{ t: "strideLine", fx, col: st }] });
+  }
+  // 11. trunk posture at release
+  {
+    let best = view === "side" ? -1e9 : 0, at = rel;
+    for (let i = relW[0]; i <= relW[1]; i++) {
+      const v = [shm(i)[0] - hpm(i)[0], shm(i)[1] - hpm(i)[1]];
+      const a = view === "side" ? Math.atan2(v[0] * dir, -v[1]) * 180 / Math.PI : Math.abs(Math.atan2(v[0], -v[1]) * 180 / Math.PI);
+      if (view === "side" ? a > best : a > best) { best = a; at = i }
+    }
+    if (view === "side") {
+      const bad = best < 20 ? (20 - best) / 6 + 1 : 0;
+      const [st, ex] = st3(bad, 1, 2, 3);
+      F.push({ id: "trunkRel", frame: at, moment: "Release", status: st, extreme: ex,
+        title: st === "good" ? "Good forward tilt at release" : "Too upright at release",
+        meas: `Trunk ${best.toFixed(0)}° forward of vertical`,
+        body: st === "good" ? "The chest is tilted forward over the front leg as he releases, which adds extension toward the plate."
+          : "The chest is still fairly upright when the ball comes out. Tilting forward over a firm front leg adds extension and lets the arm finish without strain.",
+        drills: st === "good" ? [] : ["towel", "chestOverKnee"], ann: [{ t: "trunk", col: st }] });
+    } else {
+      const bad = best > 35 ? (best - 35) / 10 + 1 : 0;
+      const [st, ex] = st3(bad, 1, 2, 3);
+      F.push({ id: "trunkRel", frame: at, moment: "Release", status: st, extreme: ex,
+        title: st === "good" ? "Posture stays stacked at release" : "Leans hard to the glove side",
+        meas: `Trunk ${best.toFixed(0)}° from vertical`,
+        body: st === "good" ? "The trunk tilts a normal amount toward the glove side for his arm slot without falling over."
+          : "The trunk falls far over to the glove side at release. Some tilt is normal, but this much usually means he's creating arm slot by leaning instead of rotating, which is hard to repeat and adds stress.",
+        drills: st === "good" ? [] : ["postureHolds", "targetLine"], ann: [{ t: "trunk", col: st }] });
+    }
+  }
+  // 12. throwing elbow height at foot strike
+  {
+    let el = -1e9; for (let i = fs; i <= Math.min(T - 1, fs + 1); i++) el = Math.max(el, (K[i][Tt.sh][1] - K[i][Tt.el][1]) / torso);
+    const bad = el > 0.2 ? (el - 0.2) / 0.15 + 1 : 0;
+    const [st, ex] = st3(bad, 1, 2, 3);
+    F.push({ id: "elbow", frame: fs, moment: "Foot strike", status: st, extreme: ex,
+      title: st === "good" ? "Elbow at shoulder height at foot strike" : "Elbow above the shoulder line",
+      meas: `Elbow ${Math.abs(el).toFixed(2)} torso-lengths ${el >= 0 ? "above" : "below"} the shoulder`,
+      body: st === "good" ? "When the front foot lands the throwing elbow is at or a little below shoulder height, a safe and efficient position."
+        : "At foot strike the throwing elbow is lifted well above the shoulder line. That arm path is linked to extra stress on young shoulders and elbows, so it's worth cleaning up early.",
+      drills: st === "good" ? [] : ["footballThrows", "powerPos"], ann: [{ t: "elbowLine", col: st }], hl: st === "good" ? [] : [[Tt.sh, Tt.el]] });
+  }
+  // 13. arm slot at release (behind or front view; informational)
+  if (view !== "side") {
+    const sh = K[rel][Tt.sh], wr = K[rel][Tt.wr];
+    const slot = Math.atan2(sh[1] - wr[1], Math.abs(wr[0] - sh[0])) * 180 / Math.PI;
+    const name = slot > 60 ? "over the top" : slot > 40 ? "high three-quarter" : slot > 20 ? "three-quarter" : slot > 0 ? "low three-quarter" : "sidearm";
+    c.slot = slot;
+    F.push({ id: "slot", frame: rel, moment: "Release", status: "good", info: true,
+      title: `Arm slot: ${name}`, meas: `Arm about ${slot.toFixed(0)}° above horizontal (approximate)`,
+      body: "There's no single right arm slot. What matters is that it's natural for him and the same every pitch. Compare this across clips: big changes usually mean the delivery is changing.",
+      drills: [], ann: [{ t: "slot", deg: slot }] });
+  }
+  // 14. tempo
+  {
+    const tl = (fs - lift) / FPS, tr = (rel - fs) / FPS;
+    c.tempo = tl;
+    const bad = tl < 0.45 ? (0.45 - tl) / 0.08 + 1 : tl > 1.3 ? (tl - 1.3) / 0.2 + 1 : 0;
+    const [st, ex] = st3(bad, 1, 2, 3);
+    F.push({ id: "tempo", frame: fs, moment: "Tempo", status: st, extreme: ex,
+      title: st === "good" ? "Smooth tempo" : tl < 0.45 ? "Rushing to the plate" : "Slow, drifting tempo",
+      meas: `Leg lift → foot strike ${tl.toFixed(2)} s · foot strike → release ${tr.toFixed(2)} s`,
+      body: st === "good" ? "Time from the top of the leg lift to foot strike is in a comfortable range, so the arm has time to get up and the body stays together."
+        : tl < 0.45 ? "He gets from the top of the leg lift to foot strike very quickly. Rushing usually leaves the arm behind and the glove side flying open."
+        : "He takes a long time from the top of the leg lift to foot strike. A slow, drifting move can lose momentum and make timing hard to repeat.",
+      drills: st === "good" ? [] : tl < 0.45 ? ["rhythmCount", "balanceHold"] : ["rhythmCount", "hipLead"], ann: [{ t: "tempo", tl, tr }] });
+  }
+  // 15. early drift before the top of the leg lift (side view)
+  if (view === "side") {
+    const kh = K.map((f) => (f[Tt.an][1] - f[G.kn][1]) / torso);
+    const base = median(kh.slice(0, Math.max(3, lift - 20)));
+    const thr = base + 0.25 * (kh[lift] - base);
+    let ls = lift; while (ls > 0 && kh[ls - 1] > thr) ls--;
+    const drift = ((hpm(lift)[0] - hpm(ls)[0]) * dir) / height;
+    const bad = drift / 0.08;
+    const [st, ex] = st3(bad, 1, 1.9, 2.8);
+    F.push({ id: "drift", frame: lift, moment: "Leg lift", status: st, extreme: ex,
+      title: st === "good" ? "Stays back until the top of the lift" : "Drifts toward the plate early",
+      meas: `Hips move ${(Math.max(0, drift) * 100).toFixed(0)}% of height toward the plate during the lift`,
+      body: st === "good" ? "The hips stay over the back leg while the knee comes up, then the move to the plate starts. That keeps the timing simple."
+        : "The hips slide toward the plate before the knee reaches the top. Drifting early makes him rush and land before the arm is ready.",
+      drills: st === "good" ? [] : ["liftPause", "balanceHold"], ann: [{ t: "hipPath", from: ls, to: lift, col: st }] });
+  }
+  for (const f of F) f.level = f.status === "good" ? null : f.status === "watch" ? "light" : f.extreme ? "heavy" : "standard";
   const order = { fix: 0, watch: 1, good: 2 };
   c.findings = F;
   c.sorted = [...F].sort((a, b) => order[a.status] - order[b.status] || a.frame - b.frame);
@@ -670,6 +849,52 @@ function drawAnn(ctx, c, f, kp, u) {
     } else if (a.t === "toCatcher") {
       const h = mid(kp[11], kp[12]); arrow(ctx, [h[0], h[1] - 0.4 * torso], [h[0], h[1] - 2.4 * torso], C.target, u, 6);
       label(ctx, "to catcher", h[0] + 16 * u, h[1] - 2.3 * torso, C.target, u, "left");
+    } else if (a.t === "knee") {
+      const h = kp[S.g.hip], kn = kp[S.g.kn], an = kp[S.g.an];
+      ctx.strokeStyle = col; ctx.lineWidth = 7 * u; ctx.beginPath(); ctx.moveTo(h[0], h[1]); ctx.lineTo(kn[0], kn[1]); ctx.lineTo(an[0], an[1]); ctx.stroke();
+      const v1 = Math.atan2(h[1] - kn[1], h[0] - kn[0]), v2 = Math.atan2(an[1] - kn[1], an[0] - kn[0]);
+      ctx.lineWidth = 4 * u; ctx.beginPath(); ctx.arc(kn[0], kn[1], R * 0.9, Math.min(v1, v2), Math.max(v1, v2) - Math.min(v1, v2) > Math.PI ? Math.min(v1, v2) + 2 * Math.PI : Math.max(v1, v2)); ctx.stroke();
+      const d1 = [h[0] - kn[0], h[1] - kn[1]], d2 = [an[0] - kn[0], an[1] - kn[1]];
+      const angle = Math.acos(Math.max(-1, Math.min(1, (d1[0] * d2[0] + d1[1] * d2[1]) / (Math.hypot(...d1) * Math.hypot(...d2) || 1)))) * 180 / Math.PI;
+      label(ctx, `front knee ${angle.toFixed(0)}°`, kn[0] + (dir > 0 ? 1 : -1) * (R + 14 * u), kn[1], col, u, dir > 0 ? "left" : "right");
+    } else if (a.t === "headPath" || a.t === "hipPath") {
+      if (!c.map || !c.sm) continue;
+      const pts = [];
+      for (let i = a.from; i <= a.to; i++) {
+        const f = c.sm[i]; let q;
+        if (a.t === "hipPath") q = mid(f[11], f[12]);
+        else { const hs = [0, 1, 2, 3, 4].map((j) => f[j]).filter((z) => z[2] > 0.25); const zz = hs.length ? hs : [f[0]]; q = [zz.reduce((t, z) => t + z[0], 0) / zz.length, zz.reduce((t, z) => t + z[1], 0) / zz.length] }
+        pts.push(c.map(q));
+      }
+      if (pts.length < 2) continue;
+      ctx.strokeStyle = col; ctx.lineWidth = 5 * u; ctx.beginPath(); pts.forEach((q, i) => i ? ctx.lineTo(q[0], q[1]) : ctx.moveTo(q[0], q[1])); ctx.stroke();
+      ctx.fillStyle = col; for (const q of [pts[0], pts[pts.length - 1]]) { ctx.beginPath(); ctx.arc(q[0], q[1], 8 * u, 0, 7); ctx.fill() }
+      const e = pts[pts.length - 1];
+      label(ctx, a.t === "hipPath" ? "hip path during the lift" : "head path", e[0] + 20 * u, e[1] - 34 * u, col, u, "left");
+    } else if (a.t === "strideLine") {
+      const back = kp[S.t.an], fa = c.map ? c.map([a.fx, 0]) : [kp[S.g.an][0], 0];
+      ctx.strokeStyle = C.target; ctx.lineWidth = 4 * u; ctx.setLineDash([10 * u, 9 * u]); ctx.beginPath(); ctx.moveTo(back[0], back[1]); ctx.lineTo(back[0], back[1] - 2.2 * torso); ctx.stroke(); ctx.setLineDash([]);
+      label(ctx, "line to the plate", back[0] + 14 * u, back[1] - 2.2 * torso, C.target, u, "left");
+      const fy = kp[S.g.an][1];
+      ctx.strokeStyle = col; ctx.lineWidth = 6 * u; ctx.beginPath(); ctx.arc(fa[0], fy, R * 0.8, 0, 7); ctx.stroke();
+      label(ctx, "front foot lands here", fa[0] + (fa[0] >= back[0] ? 1 : -1) * (R + 12 * u), fy + R, col, u, fa[0] >= back[0] ? "left" : "right");
+    } else if (a.t === "elbowLine") {
+      const ts = kp[S.t.sh], gs = kp[S.g.sh], el = kp[S.t.el];
+      const dx = ts[0] - gs[0], dy = ts[1] - gs[1], L = Math.hypot(dx, dy) || 1;
+      ctx.strokeStyle = "rgba(255,255,255,.8)"; ctx.lineWidth = 3 * u; ctx.setLineDash([9 * u, 8 * u]);
+      ctx.beginPath(); ctx.moveTo(gs[0] - dx / L * torso * 0.4, gs[1] - dy / L * torso * 0.4); ctx.lineTo(ts[0] + dx / L * torso * 1.2, ts[1] + dy / L * torso * 1.2); ctx.stroke(); ctx.setLineDash([]);
+      ctx.strokeStyle = col; ctx.lineWidth = 6 * u; ctx.beginPath(); ctx.arc(el[0], el[1], R * 0.75, 0, 7); ctx.stroke();
+      label(ctx, a.col === "good" ? "elbow at shoulder line ✓" : "elbow above shoulder line", el[0] + 20 * u, el[1] - R, col, u, "left");
+    } else if (a.t === "slot") {
+      const sh = kp[S.t.sh], wr = kp[S.t.wr];
+      const dx = wr[0] - sh[0], dy = wr[1] - sh[1];
+      ctx.strokeStyle = "#8fbaff"; ctx.lineWidth = 6 * u; ctx.beginPath(); ctx.moveTo(sh[0], sh[1]); ctx.lineTo(sh[0] + dx * 1.3, sh[1] + dy * 1.3); ctx.stroke();
+      ctx.strokeStyle = "rgba(255,255,255,.7)"; ctx.lineWidth = 3 * u; ctx.setLineDash([9 * u, 8 * u]); ctx.beginPath(); ctx.moveTo(sh[0], sh[1]); ctx.lineTo(sh[0] + Math.sign(dx || 1) * Math.hypot(dx, dy) * 1.3, sh[1]); ctx.stroke(); ctx.setLineDash([]);
+      label(ctx, `arm slot ≈ ${a.deg.toFixed(0)}°`, sh[0] + dx * 1.3 + Math.sign(dx || 1) * 14 * u, sh[1] + dy * 1.3, "#8fbaff", u, dx >= 0 ? "left" : "right");
+    } else if (a.t === "tempo") {
+      const nose = kp[0];
+      label(ctx, `lift → foot strike ${a.tl.toFixed(2)} s`, nose[0], nose[1] - 120 * u, colOf(f.status), u, "center");
+      label(ctx, `foot strike → release ${a.tr.toFixed(2)} s`, nose[0], nose[1] - 76 * u, "rgba(230,235,245,.95)", u, "center");
     } else if (a.t === "legOut") {
       const hp = kp[S.t.hip], an = kp[S.t.an]; const d = dist(hp, an) || 1;
       const e = [an[0] + (an[0] - hp[0]) / d * 40 * u, an[1] + (an[1] - hp[1]) / d * 40 * u];
@@ -749,7 +974,7 @@ function compose(ctx, c, W, H, idx, opts) {
   ctx.save();
   if (kp && opts.skeleton) drawSkeleton(ctx, kp, u, opts.finding ? opts.finding.hl : null);
   if (kp && opts.finding && opts.showAnn !== false) {
-    const cs = { ...c, W, H, torso: c.torso * k, height: c.height * k };
+    const cs = { ...c, W, H, torso: c.torso * k, height: c.height * k, map: (p) => [p[0] * k + ox, p[1] * k + oy] };
     drawAnn(ctx, cs, opts.finding, kp, u);
   }
   ctx.restore();
@@ -877,16 +1102,17 @@ function renderReport() {
     <span class="k">${label[k]}</span><span class="v">${fmt(c.fs0 + ev[k] / FPS)} s</span>
     <span class="nudge"><span data-nudge="-1" aria-label="Earlier">◀</span><span data-nudge="1" aria-label="Later">▶</span></span></div>`).join("");
   const items = c.sorted.map((f, i) => `<div class="finding ${f.status}" data-i="${i}" tabindex="0" role="button" aria-label="Show ${esc(f.title)} on the video">
-      <div class="row"><h3>${esc(f.title)}</h3><span class="pill ${f.status}">${f.status === "fix" ? "Fix" : f.status === "watch" ? "Watch" : "Good"}</span></div>
+      <div class="row"><h3>${esc(f.title)}</h3><span class="pill ${f.status}">${f.info ? "Note" : f.status === "fix" ? "Fix" : f.status === "watch" ? "Watch" : "Good"}</span></div>
       <div class="meas">${esc(f.moment)} · ${esc(f.meas)}</div>
       <p>${esc(f.body)}</p>
-      ${(f.drills || []).map((d) => { const D = DRILLS[d]; return `<details class="drill"><summary>${esc(D.name)} <span class="meas">· ${esc(D.reps)}</span></summary><ol>${D.steps.map((s) => `<li>${esc(s)}</li>`).join("")}</ol><div class="cue">Cue: "${esc(D.cue)}"</div></details>` }).join("")}
+      ${(f.drills || []).map((d) => { const D = DRILLS[d]; return `<details class="drill"><summary>${esc(D.name)} <span class="meas">· ${esc(doseOf(d, f.level))}</span></summary><ol>${D.steps.map((s) => `<li>${esc(s)}</li>`).join("")}</ol><div class="cue">Cue: "${esc(D.cue)}"</div></details>` }).join("")}
     </div>`).join("");
   body.innerHTML = `<p class="eyebrow" style="margin-top:12px">Key moments · tap to view, ◀ ▶ to adjust</p><div class="moments">${chips}</div>
     <p class="eyebrow">Checks · ${c.useHand === "R" ? "right-handed" : "left-handed"} pitcher, ${c.useView === "side" ? "side view" : "behind or front view"}</p>
     <div class="findings">${items}</div>
     <div class="actions">
       <button class="btn primary" id="exportBtn" type="button">Export annotated video (MP4)</button>
+      <button class="btn" id="pdfBtn" type="button">Download practice plan (PDF)</button>
       <button class="btn" id="copyBtn" type="button">Copy drill plan</button>
     </div>
     <p class="status" id="exportStatus" role="status"></p>
@@ -907,6 +1133,7 @@ function renderReport() {
   });
   $("exportBtn").onclick = () => exportClips([c], c);
   $("copyBtn").onclick = () => copyText(planText(c), $("exportStatus"), $("planText"));
+  $("pdfBtn").onclick = () => downloadPlanPdf(planModelClip(c), $("exportStatus"));
   const cl = body.querySelector("[data-combined]"); if (cl) cl.onclick = () => selectAll();
 }
 function nudge(k, d) {
@@ -967,8 +1194,12 @@ async function analyzeGroup(g, st) {
 const CHECKS = {
   gloveFS: { name: "Glove at foot strike", need: "any" }, gloveFin: { name: "Glove after release", need: "any" },
   falloff: { name: "Direction to the plate", need: "behind" }, finish: { name: "Finish over the front leg", need: "side" },
-  stride: { name: "Stride length", need: "side" }, armUp: { name: "Arm timing at foot strike", need: "side" },
-  balance: { name: "Balance at the top", need: "any" }
+  elbow: { name: "Elbow height at foot strike", need: "any" }, kneeBrace: { name: "Front knee at release", need: "side" },
+  strideDir: { name: "Stride direction", need: "behind" }, stride: { name: "Stride length", need: "side" },
+  armUp: { name: "Arm timing at foot strike", need: "side" }, trunkRel: { name: "Posture at release", need: "any" },
+  drift: { name: "Early drift", need: "side" }, head: { name: "Head stability", need: "any" },
+  tempo: { name: "Tempo", need: "any" }, balance: { name: "Balance at the top", need: "any" },
+  slot: { name: "Arm slot", need: "behind" }
 };
 const RANK = { fix: 2, watch: 1, good: 0 };
 function combine(g) {
@@ -982,14 +1213,37 @@ function combine(g) {
   const order = Object.keys(CHECKS);
   const checks = [...map.values()].map((e) => ({ ...e, status: e.worst.status, score: e.ev.reduce((s, x) => s + RANK[x.f.status], 0), flaggedIn: e.ev.filter((x) => x.f.status !== "good") }))
     .sort((a, b) => RANK[b.status] - RANK[a.status] || b.score - a.score || order.indexOf(a.id) - order.indexOf(b.id));
-  const flagged = checks.filter((e) => e.status !== "good"), keep = checks.filter((e) => e.status === "good");
+  // consistency between clips filmed from the same kind of angle
+  const cons = [];
+  const addCons = (id, label, vals, unit, fmtV, limit, drills, needView) => {
+    const ev = done.filter((c) => (needView ? c.useView === needView : true) && vals(c) != null).map((c) => ({ c, f: c.findings.find((f) => f.id === id) })).filter((x) => x.f);
+    if (ev.length < 2) return;
+    const vs = ev.map((x) => vals(x.c)), lo = Math.min(...vs), hi = Math.max(...vs), spread = hi - lo;
+    const st = spread > limit * 1.8 ? "fix" : spread > limit ? "watch" : "good";
+    const worst = { id: "cons_" + id, status: st, level: st === "watch" ? "light" : st === "fix" ? "standard" : null, drills: st === "good" ? [] : drills,
+      title: st === "good" ? `${label} is consistent across clips` : `${label} changes from clip to clip`,
+      body: st === "good" ? `${label} stays within ${fmtV(spread)}${unit} across these clips, a sign the delivery is repeating.`
+        : `${label} ranges from ${fmtV(lo)}${unit} to ${fmtV(hi)}${unit} across these clips. A delivery that changes pitch to pitch is hard to command. Work on repeating one version of it.` };
+    cons.push({ id: "cons_" + id, name: label + " consistency", ev, worst, status: st, score: RANK[st], flaggedIn: st === "good" ? [] : ev.map((x) => ({ c: x.c, f: { ...x.f, drills, level: worst.level } })) });
+  };
+  addCons("stride", "Stride length", (c) => c.strideR != null ? c.strideR * 100 : null, "% of height", (v) => v.toFixed(0), 8, ["strideTape", "boxLanding"], "side");
+  addCons("tempo", "Tempo", (c) => c.tempo, " s", (v) => v.toFixed(2), 0.15, ["rhythmCount"], null);
+  addCons("slot", "Arm slot", (c) => c.slot, "°", (v) => v.toFixed(0), 12, ["slotRepeat"], "behind");
+  checks.push(...cons); checks.sort((a, b) => RANK[b.status] - RANK[a.status] || b.score - a.score);
+  const flagged = checks.filter((e) => e.status !== "good"), keep = checks.filter((e) => e.status === "good" && !e.worst.info);
   const plan = new Map();
+  const LV = { light: 0, standard: 1, heavy: 2 };
   for (const e of flagged) for (const x of e.flaggedIn) for (const d of x.f.drills || []) {
-    if (!plan.has(d)) plan.set(d, { d, fixes: [] });
-    const t = e.worst.title; if (!plan.get(d).fixes.includes(t)) plan.get(d).fixes.push(t);
+    if (!plan.has(d)) plan.set(d, { d, fixes: [], level: "light", rank: 0 });
+    const p = plan.get(d), t = e.worst.title;
+    if (!p.fixes.includes(t)) p.fixes.push(t);
+    if (LV[x.f.level || "light"] > LV[p.level]) p.level = x.f.level;
+    p.rank += RANK[x.f.status] * (1 + LV[x.f.level || "light"]);
   }
+  const planList = [...plan.values()].sort((a, b) => b.rank - a.rank);
+  planList.forEach((p, i) => { p.startHere = i < 2 && p.level !== "light" });
   const notChecked = order.filter((id) => !map.has(id));
-  return { done, checks, flagged, keep, plan: [...plan.values()], notChecked };
+  return { done, checks, flagged, keep, plan: planList, notChecked };
 }
 const NEED_MSG = { side: "needs a side view (1st- or 3rd-base side)", behind: "needs a view from behind (center field)" };
 function renderCombined() {
@@ -1000,9 +1254,9 @@ function renderCombined() {
     const n = { fix: 0, watch: 0, good: 0 }; R.checks.forEach((e) => n[e.status]++);
     const pending = g.clips.filter((c) => !c.findings).length;
     const angles = g.clips.map((c) => `<span class="angle ${c.findings ? "" : "pending"}">${esc(viewName(c))} · ${esc(c.name)}</span>`).join("");
-    const plan = R.plan.map((p) => { const D = DRILLS[p.d]; return `<li><details class="drill"><summary>${esc(D.name)} <span class="meas">· ${esc(D.reps)}</span></summary><ol>${D.steps.map((x) => `<li>${esc(x)}</li>`).join("")}</ol><div class="cue">Cue: "${esc(D.cue)}"</div></details><div class="works">Works on: ${esc(p.fixes.join("; "))}</div></li>` }).join("");
+    const plan = R.plan.map((p) => { const D = DRILLS[p.d]; return `<li><details class="drill"><summary>${p.startHere ? `<span class="pill fix sm">Start here</span> ` : ""}${esc(D.name)} <span class="meas">· ${esc(doseOf(p.d, p.level))}</span></summary><ol>${D.steps.map((x) => `<li>${esc(x)}</li>`).join("")}</ol><div class="cue">Cue: "${esc(D.cue)}"</div></details><div class="works">Works on: ${esc(p.fixes.join("; "))}</div></li>` }).join("");
     const checks = R.checks.map((e, ci) => `<div class="finding ${e.status}">
-        <div class="row"><h3>${esc(e.worst.title)}</h3><span class="pill ${e.status}">${e.status === "fix" ? "Fix" : e.status === "watch" ? "Watch" : "Good"}</span></div>
+        <div class="row"><h3>${esc(e.worst.title)}</h3><span class="pill ${e.status}">${e.worst.info ? "Note" : e.status === "fix" ? "Fix" : e.status === "watch" ? "Watch" : "Good"}</span></div>
         <p>${esc(e.worst.body)}</p>
         ${e.ev.map((x, xi) => `<button type="button" class="evrow" data-g="${gi}" data-c="${state.clips.indexOf(x.c)}" data-fr="${x.f.frame}" data-id="${x.f.id}"><span class="pill sm ${x.f.status}">${x.f.status}</span><span class="src">${esc(viewName(x.c))} · ${esc(x.c.name)}</span><span class="meas">${esc(x.f.meas)}</span></button>`).join("")}
       </div>`).join("");
@@ -1013,7 +1267,7 @@ function renderCombined() {
       <div class="angles">${angles}</div>
       ${pending ? `<div class="actions" style="margin-top:4px"><button class="btn primary" type="button" data-act="analyze">Analyze ${pending === g.clips.length ? "all" : "remaining"} ${pending} clip${pending === 1 ? "" : "s"}</button></div>` : ""}
       ${R.done.length ? `
-        <p class="eyebrow" style="margin-top:14px">Practice plan · drills from every angle, most important first</p>
+        <p class="eyebrow" style="margin-top:14px">Practice plan · drills from every angle, most important first · reps scale with how far off each issue is</p>
         ${R.plan.length ? `<ol class="plan">${plan}</ol>` : `<p class="note">Nothing flagged across these angles.</p>`}
         ${R.keep.length ? `<p class="note"><b>Keep doing:</b> ${esc(R.keep.map((e) => e.worst.title).join(" · "))}</p>` : ""}
         <p class="eyebrow" style="margin-top:14px">What each angle showed · tap a row to see it on video</p>
@@ -1021,6 +1275,7 @@ function renderCombined() {
         ${nc.length ? `<p class="note">Not checked yet: ${esc(nc.join("; "))}.</p>` : ""}
         <div class="actions">
           <button class="btn primary" type="button" data-act="export">Export all ${R.done.length} clips as one video (MP4)</button>
+          <button class="btn" type="button" data-act="pdf">Download practice plan (PDF)</button>
           <button class="btn" type="button" data-act="copy">Copy combined drill plan</button>
         </div>` : ""}
       <p class="status" data-st role="status"></p>
@@ -1034,6 +1289,7 @@ function renderCombined() {
       if (act === "analyze") analyzeGroup(g, st);
       if (act === "export") exportClips(g.clips.filter((c) => c.findings), null, g, st, b);
       if (act === "copy") copyText(groupPlanText(g), st, card.querySelector("textarea"));
+      if (act === "pdf") downloadPlanPdf(planModelGroup(g), st);
     });
   });
   root.querySelectorAll(".evrow").forEach((b) => b.onclick = async () => {
@@ -1064,14 +1320,14 @@ async function renderClip(c, ctx, W, H, emit, prog) {
   const a = Math.max(0, E.lift - Math.round(1.0 * FPS)), b = Math.min(T - 1, E.fin + Math.round(0.6 * FPS));
   const s0 = Math.max(0, E.lift - Math.round(0.25 * FPS)), s1 = Math.min(T - 1, E.fin + Math.round(0.25 * FPS));
   const freezes = new Map();
-  for (const f of [...c.findings].sort((x, y) => x.frame - y.frame)) { const fr = Math.max(s0, Math.min(s1, f.frame)); if (!freezes.has(fr)) freezes.set(fr, []); freezes.get(fr).push(f) }
+  for (const f of freezeList(c)) { const fr = Math.max(s0, Math.min(s1, f.frame)); if (!freezes.has(fr)) freezes.set(fr, []); freezes.get(fr).push(f) }
   for (let i = a; i <= b; i++) { await seek(c.fs0 + i / FPS); compose(ctx, c, W, H, i, { skeleton: true, banner, chip: "REAL SPEED", chipCol: "#ffffff" }); await emit(); if (i % 10 === 0) prog() }
   for (let i = s0; i <= s1; i++) {
     await seek(c.fs0 + i / FPS);
     compose(ctx, c, W, H, i, { skeleton: true, banner, chip: "SLOW MO ¼×", chipCol: "#8fbaff" });
     for (let r = 0; r < 4; r++) await emit();
     for (const f of freezes.get(i) || []) {
-      const hold = Math.round((f.status === "good" ? 3.4 : 4.6) * FPS);
+      const hold = Math.round(holdOf(f) * FPS);
       for (let s = 0; s < hold; s++) {
         const fade = Math.min(1, s / 8);
         compose(ctx, c, W, H, i, { skeleton: true, finding: f, dim: 0.22 * fade, showAnn: s >= 4, panel: s >= 4, panelAlpha: Math.min(1, (s - 3) / 5), banner,
@@ -1082,11 +1338,17 @@ async function renderClip(c, ctx, W, H, emit, prog) {
     }
   }
 }
+/* freeze on every flagged check plus the arm-slot note; good checks go on the summary card instead */
+function freezeList(c) {
+  const fl = c.findings.filter((f) => f.status !== "good" || f.info);
+  return (fl.length ? fl : c.findings.filter((f) => f.id === "balance")).sort((x, y) => x.frame - y.frame);
+}
+const holdOf = (f) => f.info ? 2.6 : f.status === "fix" ? 4.4 : f.status === "watch" ? 3.8 : 3;
 function clipFrames(c) {
   const E = c.events, T = c.sm.length;
   const a = Math.max(0, E.lift - Math.round(1.0 * FPS)), b = Math.min(T - 1, E.fin + Math.round(0.6 * FPS));
   const s0 = Math.max(0, E.lift - Math.round(0.25 * FPS)), s1 = Math.min(T - 1, E.fin + Math.round(0.25 * FPS));
-  return (b - a + 1) + (s1 - s0 + 1) * 4 + c.findings.reduce((t, f) => t + Math.round((f.status === "good" ? 3.4 : 4.6) * FPS), 0);
+  return (b - a + 1) + (s1 - s0 + 1) * 4 + freezeList(c).reduce((t, f) => t + Math.round(holdOf(f) * FPS), 0);
 }
 /* blurred backdrop from a clip frame (or plain dark) */
 async function backdrop(ctx, W, H, c, idx) {
@@ -1105,7 +1367,12 @@ function drawTitleCard(ctx, W, H, eyebrow, title, lines) {
   ctx.textBaseline = "alphabetic";
 }
 /* items: [{title, status, detail}] ; keep: string */
-function drawSummaryCard(ctx, W, H, title, sub, items, keep) {
+function drawSummaryCard(ctx, W, H, title, sub, itemsIn, keepIn) {
+  const MAX = H > W ? 7 : 4;
+  const items = itemsIn.slice(0, MAX);
+  if (itemsIn.length > MAX) items.push({ title: `+${itemsIn.length - MAX} more`, status: "watch", detail: "See the full practice plan in Mound Check." });
+  const kp = (keepIn || "").split(" · ").filter(Boolean);
+  const keep = kp.length > 6 ? kp.slice(0, 6).join(" · ") + ` · and ${kp.length - 6} more` : kp.join(" · ");
   const u = Math.min(W, H) / 1080; let y = 130 * u; const x = 70 * u, maxW = W - x * 2 - 34 * u;
   ctx.textBaseline = "top"; ctx.textAlign = "left";
   ctx.font = `800 ${72 * u}px "Saira Condensed", "Arial Narrow", sans-serif`; ctx.fillStyle = "#fff"; ctx.fillText("WHAT TO WORK ON", x, y); y += 90 * u;
@@ -1223,36 +1490,113 @@ async function saveBlob(blob, filename, st) {
   setTimeout(() => { URL.revokeObjectURL(a.href); a.remove() }, 4000);
   st.textContent = `Downloaded ${filename}.`;
 }
-function drillLines(d, lines) { const D = DRILLS[d]; lines.push(`   - ${D.name} (${D.reps})`); D.steps.forEach((s, j) => lines.push(`       ${j + 1}) ${s}`)); lines.push(`       Cue: "${D.cue}"`) }
-function planText(c) {
-  const lines = [`${c.label ? c.label + " · " : ""}${c.name}: drill plan (Mound Check)`, ""];
-  const todo = c.sorted.filter((f) => f.status !== "good"), keep = c.sorted.filter((f) => f.status === "good");
-  if (!todo.length) lines.push("Nothing flagged on this clip.");
-  todo.forEach((f, i) => {
-    lines.push(`${i + 1}. ${f.title} (${f.status === "fix" ? "fix" : "watch"}; ${f.moment.toLowerCase()}: ${f.meas})`, `   ${f.body}`);
-    f.drills.forEach((d) => drillLines(d, lines));
-    lines.push("");
-  });
-  if (keep.length) lines.push("Keep doing: " + keep.map((f) => f.title).join("; "));
-  return lines.join("\n");
-}
-function groupPlanText(g) {
-  const R = combine(g);
-  const lines = [`${g.name}: combined drill plan from ${R.done.length} angle${R.done.length === 1 ? "" : "s"} (Mound Check)`, `Angles: ${R.done.map((c) => `${viewName(c)} (${c.name})`).join(", ")}`, ""];
-  if (!R.flagged.length) lines.push("Nothing flagged across these angles.", "");
-  else {
-    lines.push("WHAT TO WORK ON");
-    R.flagged.forEach((e, i) => {
-      lines.push(`${i + 1}. ${e.worst.title} (${e.status})`);
-      e.ev.forEach((x) => lines.push(`   ${viewName(x.c)}, ${x.c.name}: ${x.f.status}, ${x.f.meas}`));
-    });
-    lines.push("", "PRACTICE PLAN (most important first)");
-    R.plan.forEach((p) => { drillLines(p.d, lines); lines.push(`       Works on: ${p.fixes.join("; ")}`) });
-    lines.push("");
+/* ---------------- practice plan (text + PDF) ---------------- */
+function planModelClip(c) {
+  const flagged = c.sorted.filter((f) => f.status !== "good");
+  const plan = new Map(), LV = { light: 0, standard: 1, heavy: 2 };
+  for (const f of flagged) for (const d of f.drills) {
+    if (!plan.has(d)) plan.set(d, { d, fixes: [], level: "light", rank: 0 });
+    const p = plan.get(d); if (!p.fixes.includes(f.title)) p.fixes.push(f.title);
+    if (LV[f.level] > LV[p.level]) p.level = f.level; p.rank += RANK[f.status] * (1 + LV[f.level]);
   }
-  if (R.keep.length) lines.push("Keep doing: " + R.keep.map((e) => e.worst.title).join("; "));
-  if (R.notChecked.length) lines.push("Not checked: " + R.notChecked.map((id) => `${CHECKS[id].name} (${NEED_MSG[CHECKS[id].need]})`).join("; "));
-  return lines.join("\n");
+  const pl = [...plan.values()].sort((a, b) => b.rank - a.rank); pl.forEach((p, i) => { p.startHere = i < 2 && p.level !== "light" });
+  return { name: c.label || c.name, sub: `${viewName(c)} · ${c.name} · ${c.useHand === "R" ? "right" : "left"}-handed`,
+    issues: flagged.map((f) => ({ title: f.title, status: f.status, body: f.body, ev: [`${f.moment}: ${f.meas}`] })),
+    plan: pl, keep: c.sorted.filter((f) => f.status === "good" && !f.info).map((f) => f.title),
+    notes: c.sorted.filter((f) => f.info).map((f) => `${f.title} (${f.meas})`),
+    notChecked: Object.keys(CHECKS).filter((id) => !c.findings.some((f) => f.id === id)).map((id) => `${CHECKS[id].name}: ${NEED_MSG[CHECKS[id].need] || "not measured"}`) };
+}
+function planModelGroup(g) {
+  const R = combine(g);
+  return { name: g.name, sub: `Combined from ${R.done.length} clip${R.done.length === 1 ? "" : "s"}: ${R.done.map((c) => `${viewName(c)} (${c.name})`).join(", ")}`,
+    issues: R.flagged.map((e) => ({ title: e.worst.title, status: e.status, body: e.worst.body, ev: e.ev.map((x) => `${viewName(x.c)}, ${x.c.name}: ${x.f.status}, ${x.f.meas}`) })),
+    plan: R.plan, keep: R.keep.map((e) => e.worst.title),
+    notes: R.checks.filter((e) => e.worst.info).flatMap((e) => e.ev.map((x) => `${x.f.title} (${viewName(x.c)}, ${x.c.name})`)),
+    notChecked: R.notChecked.map((id) => `${CHECKS[id].name}: ${NEED_MSG[CHECKS[id].need] || "not measured"}`) };
+}
+function modelText(m) {
+  const L = [`${m.name}: practice plan (Mound Check)`, m.sub, ""];
+  if (!m.issues.length) L.push("Nothing flagged.", "");
+  else {
+    L.push("WHAT TO WORK ON");
+    m.issues.forEach((it, i) => { L.push(`${i + 1}. ${it.title} (${it.status})`); it.ev.forEach((e) => L.push(`   ${e}`)) });
+    L.push("", "PRACTICE PLAN (most important first)");
+    m.plan.forEach((p, i) => {
+      const D = DRILLS[p.d];
+      L.push(`${i + 1}. ${D.name}: ${doseOf(p.d, p.level)}${p.startHere ? " (start here)" : ""}`, `   Works on: ${p.fixes.join("; ")}`);
+      D.steps.forEach((x, j) => L.push(`   ${j + 1}) ${x}`)); L.push(`   Cue: "${D.cue}"`, "");
+    });
+  }
+  if (m.keep.length) L.push("Keep doing: " + m.keep.join("; "));
+  if (m.notes.length) L.push("Notes: " + m.notes.join("; "));
+  if (m.notChecked.length) L.push("Not checked: " + m.notChecked.join("; "));
+  return L.join("\n");
+}
+const planText = (c) => modelText(planModelClip(c));
+const groupPlanText = (g) => modelText(planModelGroup(g));
+const pdfSafe = (t) => String(t).replace(/≈/g, "~").replace(/→/g, "to").replace(/✓/g, "").replace(/[“”]/g, '"').replace(/[‘’]/g, "'").replace(/[^\x00-\xFF·—–]/g, "");
+async function downloadPlanPdf(m, st) {
+  const J = window.jspdf && window.jspdf.jsPDF;
+  if (!J) { st.textContent = "The PDF library didn't load. Check your connection and reload the page."; return }
+  const doc = new J({ unit: "pt", format: "letter" });
+  const PW = 612, PH = 792, M = 54, CW = PW - M * 2;
+  let y = M;
+  const COL = { fix: [201, 58, 50], watch: [183, 121, 11], good: [35, 134, 79], ink: [22, 33, 27], muted: [91, 103, 95], accent: [31, 95, 209] };
+  const need = (h) => { if (y + h > PH - M) { doc.addPage(); y = M } };
+  const text = (t, size, style, color, indent = 0, gap = 4) => {
+    doc.setFont("helvetica", style); doc.setFontSize(size); doc.setTextColor(...color);
+    const lines = doc.splitTextToSize(pdfSafe(t), CW - indent);
+    for (const l of lines) { need(size * 1.25); doc.text(l, M + indent, y + size); y += size * 1.25 }
+    y += gap;
+  };
+  const rule = () => { need(14); doc.setDrawColor(207, 214, 205); doc.setLineWidth(0.8); doc.line(M, y + 4, PW - M, y + 4); y += 14 };
+  // header
+  doc.setFillColor(...COL.accent); doc.rect(0, 0, PW, 6, "F");
+  text("MOUND CHECK · PRACTICE PLAN", 9, "bold", COL.accent, 0, 2);
+  text(m.name, 24, "bold", COL.ink, 0, 2);
+  text(m.sub, 10, "normal", COL.muted, 0, 2);
+  text(`Prepared ${new Date().toLocaleDateString(undefined, { year: "numeric", month: "long", day: "numeric" })}`, 9, "normal", COL.muted, 0, 6);
+  rule();
+  // issues
+  text("WHAT TO WORK ON", 11, "bold", COL.ink, 0, 4);
+  if (!m.issues.length) text("Nothing flagged in these clips.", 11, "normal", COL.ink);
+  m.issues.forEach((it, i) => {
+    need(40);
+    const c = COL[it.status] || COL.ink;
+    doc.setFillColor(...c); doc.rect(M, y + 2, 4, 14, "F");
+    text(`${i + 1}. ${it.title}  (${it.status === "fix" ? "Fix" : "Watch"})`, 12, "bold", c, 12, 1);
+    text(it.body, 10, "normal", COL.ink, 12, 2);
+    it.ev.forEach((e) => text(e, 9, "normal", COL.muted, 12, 0));
+    y += 8;
+  });
+  // plan
+  if (m.plan.length) {
+    rule();
+    text("PRACTICE PLAN · MOST IMPORTANT FIRST", 11, "bold", COL.ink, 0, 2);
+    text("Reps are set by how far off each issue is. Check a box each day the drill gets done.", 9, "normal", COL.muted, 0, 8);
+    m.plan.forEach((p, i) => {
+      const D = DRILLS[p.d];
+      // keep each drill (title, dose, steps, cue, checkboxes) together on one page
+      doc.setFontSize(10); const stepLines = D.steps.reduce((t, x, j) => t + doc.splitTextToSize(pdfSafe(`${j + 1}) ${x}`), CW - 14).length, 0);
+      doc.setFontSize(9.5); const doseLines = doc.splitTextToSize(pdfSafe(`${doseOf(p.d, p.level)} · Works on: ${p.fixes.join("; ")}`), CW - 14).length;
+      need(16 + doseLines * 12 + 3 + stepLines * 12.5 + D.steps.length + 17 + 24);
+      text(`${i + 1}. ${D.name}${p.startHere ? "   START HERE" : ""}`, 12, "bold", p.startHere ? COL.fix : COL.ink, 0, 1);
+      text(`${doseOf(p.d, p.level)} · Works on: ${p.fixes.join("; ")}`, 9.5, "normal", COL.muted, 14, 3);
+      D.steps.forEach((x, j) => text(`${j + 1}) ${x}`, 10, "normal", COL.ink, 14, 1));
+      text(`Cue: "${D.cue}"`, 10, "italic", COL.muted, 14, 4);
+      need(18);
+      doc.setFont("helvetica", "normal"); doc.setFontSize(8.5); doc.setTextColor(...COL.muted); doc.setDrawColor(150, 160, 152); doc.setLineWidth(0.7);
+      ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"].forEach((d, k) => { const x = M + 14 + k * 58; doc.rect(x, y, 10, 10); doc.text(d, x + 14, y + 8.5) });
+      y += 24;
+    });
+  }
+  if (m.keep.length) { rule(); text("KEEP DOING", 11, "bold", COL.good, 0, 2); text(m.keep.join(" · "), 10, "normal", COL.ink) }
+  if (m.notes.length) { text("NOTES", 11, "bold", COL.ink, 0, 2); m.notes.forEach((n) => text(n, 10, "normal", COL.ink, 0, 1)); y += 4 }
+  if (m.notChecked.length) { text("NOT CHECKED IN THESE CLIPS", 11, "bold", COL.muted, 0, 2); m.notChecked.forEach((n) => text(n, 9.5, "normal", COL.muted, 0, 1)) }
+  const pages = doc.getNumberOfPages();
+  for (let i = 1; i <= pages; i++) { doc.setPage(i); doc.setFont("helvetica", "normal"); doc.setFontSize(8); doc.setTextColor(...COL.muted); doc.text(pdfSafe(`${m.name} · Mound Check · page ${i} of ${pages} · Automated 2D estimate from phone video; confirm with your own eye.`), M, PH - 28) }
+  const blob = doc.output("blob");
+  await saveBlob(blob, `${safeName(m.name)}_practice_plan.pdf`, st);
 }
 function copyText(text, st, ta) {
   const fallback = () => { ta.hidden = false; ta.value = text; ta.focus(); ta.select(); st.textContent = "Select all and copy the plan below." };
@@ -1323,7 +1667,7 @@ document.addEventListener("keydown", (e) => {
 });
 // warm the model in the background once the page is idle
 setTimeout(() => { loadModel().catch(() => {}) }, 1500);
-window.__moundcheck = { state, analyze, detectEvents, planText, groupPlanText, combine, groups, selectAll, exportClips };
+window.__moundcheck = { state, analyze, detectEvents, planText, groupPlanText, combine, groups, selectAll, exportClips, downloadPlanPdf, planModelGroup };
 })();
 </script>
 
