@@ -168,6 +168,7 @@ textarea.planText, textarea#planText { width: 100%; min-height: 160px; font: .85
       <ul>
         <li>One pitch or one swing per clip works best, 3 to 10 seconds long.</li>
         <li>Film the whole body, phone held steady at hip height.</li>
+        <li>Record at 60 fps if you can (iPhone: Settings › Camera › Record Video › 1080p at 60 fps). The app uses it automatically and times the swing or delivery twice as precisely.</li>
         <li>Pitching: a side view (1st- or 3rd-base side) measures the most. A view from behind shows direction to the plate.</li>
         <li>Batting: a side view facing the hitter measures the most. A view from the pitcher or catcher shows whether the head pulls off.</li>
       </ul>
@@ -254,7 +255,9 @@ textarea.planText, textarea#planText { width: 100%; min-height: 160px; font: .85
 <script>
 (() => {
 "use strict";
-const FPS = 30;
+const OUT_FPS = 30; // exported videos are always 30 fps
+let FPS = 30;      // default analysis rate; functions that work on a clip shadow this with the clip's own rate
+const fpsOf = (c) => (c && c.fps) || 30;
 const $ = (id) => document.getElementById(id);
 const BONES = [[5,6],[5,7],[7,9],[6,8],[8,10],[5,11],[6,12],[11,12],[11,13],[13,15],[12,14],[14,16]];
 const C = { fix: "#ff5a52", watch: "#ffc93f", good: "#46d98a", target: "#ffd23f", white: "#ffffff", joint: "#3ec5ff" };
@@ -488,6 +491,7 @@ function boxOf(kp) {
   return n >= 6 ? { cx: (x0 + x1) / 2, cy: (y0 + y1) / 2, size: Math.max(x1 - x0, y1 - y0) } : null;
 }
 async function trackClip(c, onProgress) {
+  const FPS = fpsOf(c), F30 = (n) => Math.max(1, Math.round(n * FPS / 30));
   const model = await loadModel();
   await setVideo(c);
   const W = video.videoWidth, H = video.videoHeight, s = Math.min(1, ANALYSIS_MAX / Math.max(W, H));
@@ -525,21 +529,76 @@ async function trackClip(c, onProgress) {
     if (onProgress) onProgress(i + 1, n);
   }
   c.frames = frames; c.fs0 = t0 + 0.5 / FPS; c.W = W; c.H = H;
-  c.sm = smooth(frames);
+  const cl = cleanTrack(frames, FPS); c.sm = cl.sm; c.quality = cl.quality;
 }
-function smooth(frames) {
-  return frames.map((_, i) => {
-    const lo = Math.max(0, i - 1), hi = Math.min(frames.length - 1, i + 1), out = [];
-    for (let k = 0; k < 17; k++) {
-      const xs = [], ys = [];
-      for (let j = lo; j <= hi; j++) { xs.push(frames[j][k][0]); ys.push(frames[j][k][1]) }
-      xs.sort((a, b) => a - b); ys.sort((a, b) => a - b);
-      out.push([xs[(xs.length - 1) >> 1], ys[(ys.length - 1) >> 1], frames[i][k][2]]);
+/* Clean-up of the raw tracking before analysis:
+   1) reject low-confidence points, one-frame spikes and left/right collapses (e.g. both ankles on one spot),
+   2) fill short gaps by linear interpolation,
+   3) smooth with a One-Euro filter (Casiez et al., 2012) run forward and backward so fast moves don't lag.
+   Distances are in torso lengths so the same settings work at any video size and frame rate. */
+function cleanTrack(frames, fps) {
+  const T = frames.length; if (T < 3) return { sm: frames.map((f) => f.map((p) => [...p])), quality: { conf: 1, fixed: 0 } };
+  const torso = median(frames.map((f) => dist(mid(f[5], f[6]), mid(f[11], f[12])))) || 100;
+  const step = 30 / fps; // 1 at 30 fps, 0.5 at 60 fps
+  const ok = frames.map((f) => f.map((p) => p[2] >= 0.15));
+  let fixed = 0;
+  // impossible jumps: no joint moves more than ~1 torso length in 1/30 s; compare with the last good position
+  const maxGapF = Math.max(1, Math.round(3 / step));
+  for (let k = 0; k < 17; k++) {
+    let last = -1;
+    for (let i = 0; i < T; i++) {
+      if (!ok[i][k]) continue;
+      if (last >= 0 && i - last <= maxGapF + 1 && dist(frames[i][k], frames[last][k]) > 1.0 * torso * step * (i - last)) { ok[i][k] = false; continue }
+      last = i;
     }
-    return out;
-  });
+  }
+  for (let k = 0; k < 17; k++) for (let i = 1; i < T - 1; i++) {
+    if (!ok[i][k] || !ok[i - 1][k] || !ok[i + 1][k]) continue;
+    const a = frames[i - 1][k], b = frames[i][k], cc = frames[i + 1][k];
+    const m = [(a[0] + cc[0]) / 2, (a[1] + cc[1]) / 2];
+    if (dist(b, m) > 0.35 * torso && dist(a, cc) < 0.25 * torso * Math.max(1, step * 2)) ok[i][k] = false; // spike out and back
+  }
+  for (const [l, r] of [[15, 16], [13, 14], [9, 10], [11, 12]]) for (let i = 1; i < T; i++) {
+    if (dist(frames[i][l], frames[i][r]) < 0.06 * torso && dist(frames[i - 1][l], frames[i - 1][r]) > 0.25 * torso) {
+      const ml = dist(frames[i][l], frames[i - 1][l]), mr = dist(frames[i][r], frames[i - 1][r]);
+      if (ml > mr) ok[i][l] = false; else ok[i][r] = false; // the joint that jumped onto the other is the bad one
+    }
+  }
+  const out = frames.map((f) => f.map((p) => [...p]));
+  const maxGap = Math.max(1, Math.round(3 / step));
+  for (let k = 0; k < 17; k++) {
+    let i = 0;
+    while (i < T) {
+      if (ok[i][k]) { i++; continue }
+      let j = i; while (j < T && !ok[j][k]) j++;
+      if (i > 0 && j < T && j - i <= maxGap) {
+        const A = frames[i - 1][k], B = frames[j][k];
+        for (let q = i; q < j; q++) { const t = (q - i + 1) / (j - i + 1); out[q][k] = [A[0] + (B[0] - A[0]) * t, A[1] + (B[1] - A[1]) * t, Math.min(A[2], B[2]) * 0.6]; fixed++ }
+      }
+      i = j;
+    }
+  }
+  // One-Euro filter, forward and backward, averaged
+  const minCut = 3.0, beta = 1.0, dCut = 1.0, te = 1 / fps;
+  const alpha = (cut) => { const tau = 1 / (2 * Math.PI * cut); return 1 / (1 + tau / te) };
+  const pass = (xs) => {
+    const y = new Array(xs.length); let xPrev = xs[0], dPrev = 0; y[0] = xs[0];
+    for (let i = 1; i < xs.length; i++) {
+      const d = (xs[i] - xPrev) / te; const ad = alpha(dCut); const dHat = ad * d + (1 - ad) * dPrev;
+      const a = alpha(minCut + beta * Math.abs(dHat)); y[i] = a * xs[i] + (1 - a) * y[i - 1];
+      xPrev = y[i]; dPrev = dHat;
+    }
+    return y;
+  };
+  for (let k = 0; k < 17; k++) for (const ax of [0, 1]) {
+    const xs = out.map((f) => f[k][ax] / torso);
+    const f1 = pass(xs), b1 = pass([...xs].reverse()).reverse();
+    for (let i = 0; i < T; i++) out[i][k][ax] = ((f1[i] + b1[i]) / 2) * torso;
+  }
+  let cs = 0, cn = 0; for (const f of frames) for (let k = 5; k < 17; k++) { cs += f[k][2]; cn++ }
+  return { sm: out, quality: { conf: cs / cn, fixed: fixed / (T * 17) } };
 }
-
+function smooth(frames, fps = 30) { return cleanTrack(frames, fps).sm }
 /* ---------------- analysis ---------------- */
 const median = (a) => { const b = [...a].sort((x, y) => x - y); return b.length ? b[b.length >> 1] : 0 };
 const pct = (a, p) => { const b = [...a].sort((x, y) => x - y); return b.length ? b[Math.min(b.length - 1, Math.floor(p * b.length))] : 0 };
@@ -555,6 +614,7 @@ function speedSeries(K, idx, torso) {
   return v.map((_, i) => (v[Math.max(0, i - 1)] + v[i] + v[Math.min(v.length - 1, i + 1)]) / 3);
 }
 function detectPitchEvents(c) {
+  const FPS = fpsOf(c), F30 = (n) => Math.max(1, Math.round(n * FPS / 30));
   const K = c.sm, T = K.length;
   const torso = median(K.map((f) => dist(mid(f[5], f[6]), mid(f[11], f[12])))) || 1;
   const vl = speedSeries(K, 9, torso), vr = speedSeries(K, 10, torso);
@@ -582,6 +642,7 @@ function detectPitchEvents(c) {
   c.torso = torso;
 }
 function analyzePitch(c) {
+  const FPS = fpsOf(c), F30 = (n) => Math.max(1, Math.round(n * FPS / 30));
   const K = c.sm, T = K.length, torso = c.torso;
   const hand = c.hand === "auto" ? c.autoHand : c.hand;
   const S = sides(hand), G = S.g, Tt = S.t;
@@ -632,7 +693,7 @@ function analyzePitch(c) {
   }
   // 3. arm up at foot strike (side view only: from behind, the hand hides behind the head and body)
   if (view === "side") {
-    const up = [fs, Math.min(T - 1, fs + 1)].some((i) => K[i][Tt.wr][1] < K[i][Tt.sh][1]);
+    const up = [fs, Math.min(T - 1, fs + F30(1))].some((i) => K[i][Tt.wr][1] < K[i][Tt.sh][1]);
     F.push({ id: "armUp", frame: fs, moment: "Foot strike", status: up ? "good" : "watch",
       title: up ? "Arm is up on time" : "Arm is late at foot strike",
       meas: up ? "Throwing hand above the shoulder" : "Throwing hand below the shoulder",
@@ -705,7 +766,7 @@ function analyzePitch(c) {
   /* ---------- additional checks ---------- */
   const ang3 = (a, b, cc) => { const v1 = [a[0] - b[0], a[1] - b[1]], v2 = [cc[0] - b[0], cc[1] - b[1]]; const d = Math.hypot(...v1) * Math.hypot(...v2) || 1; return Math.acos(Math.max(-1, Math.min(1, (v1[0] * v2[0] + v1[1] * v2[1]) / d))) * 180 / Math.PI };
   const headPt = (i) => { const pts = [0, 1, 2, 3, 4].map((k) => K[i][k]).filter((q) => q[2] > 0.25); const q = pts.length ? pts : [K[i][0]]; return [q.reduce((t, x) => t + x[0], 0) / q.length, q.reduce((t, x) => t + x[1], 0) / q.length] };
-  const relW = [rel, Math.min(T - 1, rel + 4)];
+  const relW = [rel, Math.min(T - 1, rel + F30(4))];
   const st3 = (bad, watchT, fixT, heavyT) => bad >= heavyT ? ["fix", true] : bad >= fixT ? ["fix", false] : bad >= watchT ? ["watch", false] : ["good", false];
   // 8. front knee bracing through release (side view)
   if (view === "side") {
@@ -741,13 +802,13 @@ function analyzePitch(c) {
     const armSign = Math.sign(K[rel][Tt.sh][0] - K[rel][G.sh][0]) || 1;
     const back = K[fs][Tt.an];
     const xs = [];
-    for (let i = fs; i <= Math.min(T - 1, fs + 5); i++) { const fa = K[i][G.an]; if (Math.abs(fa[0] - K[i][Tt.an][0]) > 0.15 * torso || Math.abs(fa[1] - K[i][Tt.an][1]) > 0.15 * torso) xs.push(fa[0]) }
+    for (let i = fs; i <= Math.min(T - 1, fs + F30(5)); i++) { const fa = K[i][G.an]; if (Math.abs(fa[0] - K[i][Tt.an][0]) > 0.15 * torso || Math.abs(fa[1] - K[i][Tt.an][1]) > 0.15 * torso) xs.push(fa[0]) }
     const fx = xs.length ? median(xs) : K[fs][G.kn][0];
     const off = ((fx - back[0]) * armSign) / torso; // + = toward arm side (closed), - = toward glove side (open)
     const bad = off > 0 ? off / 0.45 : -off / 0.35;
     const [st, ex] = st3(bad, 1, 1.5, 2.2);
     const kind = off > 0 ? "closed (across the body)" : "open (toward the glove side)";
-    F.push({ id: "strideDir", frame: Math.min(T - 1, fs + 2), moment: "Foot strike", status: st, extreme: ex,
+    F.push({ id: "strideDir", frame: Math.min(T - 1, fs + F30(2)), moment: "Foot strike", status: st, extreme: ex,
       title: st === "good" ? "Stride lands on line" : off > 0 ? "Stride lands closed" : "Stride lands open",
       meas: `Front foot ${Math.abs(off).toFixed(2)} torso-lengths ${off > 0 ? "to the arm side" : "to the glove side"}`,
       body: st === "good" ? "The front foot lands close to the line to the plate, so the hips can rotate fully and everything heads at the catcher."
@@ -784,7 +845,7 @@ function analyzePitch(c) {
   }
   // 12. throwing elbow height at foot strike
   {
-    let el = -1e9; for (let i = fs; i <= Math.min(T - 1, fs + 1); i++) el = Math.max(el, (K[i][Tt.sh][1] - K[i][Tt.el][1]) / torso);
+    let el = -1e9; for (let i = fs; i <= Math.min(T - 1, fs + F30(1)); i++) el = Math.max(el, (K[i][Tt.sh][1] - K[i][Tt.el][1]) / torso);
     const bad = el > 0.2 ? (el - 0.2) / 0.15 + 1 : 0;
     const [st, ex] = st3(bad, 1, 2, 3);
     F.push({ id: "elbow", frame: fs, moment: "Foot strike", status: st, extreme: ex,
@@ -822,7 +883,7 @@ function analyzePitch(c) {
   // 15. early drift before the top of the leg lift (side view)
   if (view === "side") {
     const kh = K.map((f) => (f[Tt.an][1] - f[G.kn][1]) / torso);
-    const base = median(kh.slice(0, Math.max(3, lift - 20)));
+    const base = median(kh.slice(0, Math.max(3, lift - F30(20))));
     const thr = base + 0.25 * (kh[lift] - base);
     let ls = lift; while (ls > 0 && kh[ls - 1] > thr) ls--;
     const drift = ((hpm(lift)[0] - hpm(ls)[0]) * dir) / height;
@@ -845,6 +906,7 @@ function analyzePitch(c) {
 /* ================= batting ================= */
 // lead side = the side facing the pitcher (left for a right-handed hitter); reuses sides(): g = lead, t = back
 function detectSwingEvents(c) {
+  const FPS = fpsOf(c), F30 = (n) => Math.max(1, Math.round(n * FPS / 30));
   const K = c.sm, T = K.length;
   const torso = median(K.map((f) => dist(mid(f[5], f[6]), mid(f[11], f[12])))) || 1;
   const hands = (i) => mid(K[i][9], K[i][10]);
@@ -852,17 +914,49 @@ function detectSwingEvents(c) {
   const early = K.slice(0, Math.max(3, Math.min(T, Math.round(0.4 * FPS))));
   const dR = median(early.map((f) => dist(mid(f[9], f[10]), f[6]))), dL = median(early.map((f) => dist(mid(f[9], f[10]), f[5])));
   const disp = (k) => { const m = [median(K.map((f) => f[k][0])), median(K.map((f) => f[k][1]))]; return pct(K.map((f) => dist(f[k], m)), 0.95) };
-  c.autoHand = Math.abs(dR - dL) > 0.15 * torso ? (dR < dL ? "R" : "L") : (disp(15) >= disp(16) ? "R" : "L");
+  c.handConf = Math.abs(dR - dL) / torso;
+  // clear by the hands' position; otherwise borrow the side from this player's other clips (c.handHint), then fall back to the striding foot
+  c.autoHand = c.handConf > 0.25 ? (dR < dL ? "R" : "L") : c.handHint || (disp(15) >= disp(16) ? "R" : "L");
   const hand = c.hand === "auto" ? c.autoHand : c.hand, S = sides(hand);
   const hv = K.map((f, i) => i ? dist(hands(i), hands(i - 1)) / torso : 0);
   const v = hv.map((_, i) => (hv[Math.max(0, i - 1)] + hv[i] + hv[Math.min(T - 1, i + 1)]) / 3);
-  let contact = 2, pk = -1; for (let i = 2; i < T - 2; i++) if (v[i] > pk) { pk = v[i]; contact = i }
+  // contact = the fastest hand moment that builds up like a real swing (rises over at least ~0.06 s);
+  // spikes that appear from nothing are tracking glitches, not swings
+  const cand = [];
+  for (let i = 2; i < T - 2; i++) if (v[i] >= v[i - 1] && v[i] >= v[i + 1] && v[i] > 0) cand.push(i);
+  cand.sort((a, b) => v[b] - v[a]);
+  const valid = cand.filter((i) => {
+    let l = i; while (l > 1 && v[l - 1] > 0.25 * v[i]) l--;
+    let rising = 0; for (let j = l; j < i; j++) if (v[j + 1] >= v[j] * 0.9) rising++;
+    return i - l >= F30(2) && rising >= F30(2) && v[i] * (FPS / 30) < 1.0;
+  });
+  // the follow-through can be as fast as the swing itself, so take the earliest peak that's nearly as fast as the fastest
+  const vmax = valid.length ? v[valid[0]] : 0;
+  const top = valid.length ? valid[0] : -1;
+  let contact = valid.length ? Math.min(...valid.filter((i) => v[i] >= 0.7 * vmax && i >= top - Math.round(0.35 * FPS))) : (cand.length ? cand[0] : 2);
+  const pk = v[contact];
   let launch = contact; while (launch > 1 && v[launch - 1] > 0.25 * pk) launch--;
+  // the hands are fastest just before contact, then slow sharply as the bat whips through: contact = first frame below about two-thirds of the peak speed
+  { const peakAt = contact; for (let i = peakAt + 1; i <= Math.min(T - 2, peakAt + F30(4)); i++) if (v[i] < 0.65 * pk) { contact = i; break } }
+  // filmed from the pitcher's or catcher's side the hands move mostly toward the camera, so hand speed is a weak signal.
+  // There the shoulders pass edge-on (width near zero) and then open up; contact comes as they reach about 3/4 of their open width.
+  const stanceW = median(K.slice(0, Math.max(2, launch - F30(5))).map((f) => Math.abs(f[5][0] - f[6][0]))) / torso;
+  const viewGuess = c.view !== "auto" ? c.view : stanceW > 0.35 ? "side" : "behind";
+  if (viewGuess !== "side") {
+    const sw = (i) => Math.abs(K[i][5][0] - K[i][6][0]);
+    const w0 = Math.max(0, contact - Math.round(0.5 * FPS)), w1 = Math.min(T - 1, contact + Math.round(0.2 * FPS));
+    let mn = w0; for (let i = w0; i <= w1; i++) if (sw(i) < sw(mn)) mn = i;
+    let mx = 0; for (let i = mn; i <= Math.min(T - 1, mn + Math.round(0.5 * FPS)); i++) mx = Math.max(mx, sw(i));
+    if (mx - sw(mn) > 0.2 * torso) {
+      for (let i = mn; i < T; i++) if (sw(i) >= 0.75 * mx) { contact = Math.min(T - 1, i + Math.round(0.05 * FPS)); break }
+      if (launch >= contact) launch = Math.max(1, contact - F30(3));
+    }
+  }
   const win0 = Math.max(0, launch - Math.round(1.0 * FPS));
   // foot plant: the lead foot has covered 90% of its stride (strides are small, so this is relative to its own travel)
   // walk back from the start of the swing while the front foot stays where it ends up (one stray frame allowed)
   const aL = K[launch][S.g.an]; let plant = launch, misses = 0;
-  for (let i = launch - 1; i >= win0; i--) { if (dist(K[i][S.g.an], aL) <= 0.06 * torso) { plant = i; misses = 0 } else if (++misses > 1) break }
+  for (let i = launch - 1; i >= win0; i--) { if (dist(K[i][S.g.an], aL) <= 0.06 * torso) { plant = i; misses = 0 } else if (++misses > F30(1)) break }
   let travel = 0; for (let i = win0; i < plant; i++) travel = Math.max(travel, dist(K[i][S.g.an], aL));
   c.noStride = travel < 0.12 * torso || plant <= win0;
   if (c.noStride) plant = launch;
@@ -873,10 +967,11 @@ function detectSwingEvents(c) {
   let load = lw0, best = -1; for (let i = lw0; i <= Math.max(lw0, plant - 1); i++) { const d = dist(hands(i), K[i][S.g.sh]); if (d > best) { best = d; load = i } }
   if (load >= plant) load = Math.max(0, plant - 1);
   let rel = contact; if (rel <= plant) rel = Math.min(T - 1, plant + 1);
-  const fin = Math.min(T - 1, rel + Math.round(0.35 * FPS));
+  const fin = Math.min(T - 1, rel + Math.round(0.25 * FPS)); // finish position, before he walks out of the box
   c.events = { lift: load, fs: plant, rel, fin }; c.torso = torso; c.launch = launch;
 }
 function analyzeSwing(c) {
+  const FPS = fpsOf(c), F30 = (n) => Math.max(1, Math.round(n * FPS / 30));
   const K = c.sm, T = K.length, torso = c.torso;
   const hand = c.hand === "auto" ? c.autoHand : c.hand;
   const S = sides(hand), G = S.g, Tt = S.t;
@@ -887,7 +982,7 @@ function analyzeSwing(c) {
   const st3 = (bad, watchT, fixT, heavyT) => bad >= heavyT ? ["fix", true] : bad >= fixT ? ["fix", false] : bad >= watchT ? ["watch", false] : ["good", false];
   const pre = K.slice(0, Math.max(1, plant));
   const height = pct(pre.map((f) => Math.max(f[15][1], f[16][1]) - f[0][1]), 0.9) * 1.1 || torso * 3.3;
-  const shW = median(K.slice(0, Math.max(2, (c.launch || plant) - 5)).map((f) => Math.abs(f[5][0] - f[6][0]))) / torso;
+  const shW = median(K.slice(0, Math.max(2, (c.launch || plant) - F30(5))).map((f) => Math.abs(f[5][0] - f[6][0]))) / torso;
   const autoView = shW > 0.35 ? "side" : "behind";
   const view = c.view === "auto" ? autoView : c.view;
   const pdir = Math.sign(K[plant][G.an][0] - K[plant][Tt.an][0]) || 1;
@@ -945,29 +1040,31 @@ function analyzeSwing(c) {
   }
   // 4. hands drop before the swing
   {
-    const y0 = hands(load)[1]; let maxY = y0, at = load;
-    for (let i = load; i <= Math.min(contact, (c.launch || plant) + 2); i++) if (hands(i)[1] > maxY) { maxY = hands(i)[1]; at = i }
+    // measured from foot plant: a high starting stance that settles to the shoulder is fine; a drop right before the swing is not
+    const from = Math.max(load, plant), y0 = hands(from)[1]; let maxY = y0, at = from;
+    for (let i = from; i <= Math.min(contact, (c.launch || plant) + F30(2)); i++) if (hands(i)[1] > maxY) { maxY = hands(i)[1]; at = i }
     const drop = (maxY - y0) / torso;
     const [st, ex] = st3(drop / 0.35, 1, 1.6, 2.2);
     F.push({ id: "sHands", frame: st === "good" ? (c.launch || plant) : at, moment: "Launch", status: st, extreme: ex,
       title: st === "good" ? "Hands stay up into the swing" : "Hands drop before the swing",
-      meas: `Hands drop ${drop.toFixed(2)} torso-lengths from the load`,
+      meas: `Hands drop ${drop.toFixed(2)} torso-lengths after foot plant`,
       body: st === "good" ? "The hands start the swing from about where they loaded, so the bat can work on a short, direct path."
         : "The hands drop well below where they loaded before the swing starts. That usually means the barrel dumps, the swing gets long and he hits under the ball.",
       drills: st === "good" ? [] : ["hHighTee", "hOneHandTop"], ann: [{ t: "handsPath", from: load, to: at, col: st }] });
   }
   // 5. hips lead the shoulders (side)
   if (view === "side") {
-    const sm5 = (fn) => (i) => { let t = 0, n = 0; for (let j = Math.max(0, i - 2); j <= Math.min(T - 1, i + 2); j++) { t += fn(j); n++ } return t / n };
+    const sm5 = (fn) => (i) => { let t = 0, n = 0; for (let j = Math.max(0, i - F30(2)); j <= Math.min(T - 1, i + F30(2)); j++) { t += fn(j); n++ } return t / n };
     const hw = sm5((i) => Math.abs(K[i][11][0] - K[i][12][0])), sw = sm5((i) => Math.abs(K[i][5][0] - K[i][6][0]));
     // each line's apparent width shrinks as it turns toward the pitcher; time when each has made 25% of its own turn,
     // interpolated between frames because the gap is often less than one frame at 30 fps
-    const e1 = Math.min(T - 1, contact + 6);
+    const e1 = Math.min(T - 1, contact + F30(6));
+    const st0 = Math.max(load, (c.launch || plant) - F30(3)); // time the turn from just before the swing starts, not from the coil in the load
     const cross = (wf) => {
-      const w0 = median([Math.max(0, load - 2), load, Math.min(T - 1, load + 1)].map(wf)), w1 = Math.min(...[e1 - 1, e1].map(wf));
+      const w0 = median([Math.max(0, st0 - F30(2)), st0, Math.min(T - 1, st0 + F30(1))].map(wf)), w1 = Math.min(...[e1 - F30(1), e1].map(wf));
       if (w0 - w1 < 0.07 * torso) return null; // too little visible turn to time reliably
       const thr = w0 - 0.25 * (w0 - w1);
-      for (let i = load + 1; i <= e1; i++) if (wf(i) <= thr) { const a = wf(i - 1), b = wf(i); return i - 1 + (a - thr) / Math.max(1e-6, a - b) }
+      for (let i = st0 + 1; i <= e1; i++) if (wf(i) <= thr) { const a = wf(i - 1), b = wf(i); return i - 1 + (a - thr) / Math.max(1e-6, a - b) }
       return null;
     };
     const hsF = cross(hw), ssF = cross(sw);
@@ -975,7 +1072,7 @@ function analyzeSwing(c) {
       const hs = Math.round(hsF), ss = Math.round(ssF);
       const lead = (ssF - hsF) / FPS;
       // differences under about one frame can't be resolved at 30 fps, so only flag clear shoulder-first timing
-      const st = lead >= -0.005 ? "good" : lead > -0.04 ? "watch" : "fix";
+      const st = lead >= -0.02 ? "good" : lead > -0.05 ? "watch" : "fix";
       F.push({ id: "sSeq", frame: Math.min(hs, ss), moment: "Launch", status: st, extreme: lead <= -0.08,
         title: st === "good" ? (lead >= 0.015 ? "Hips lead the shoulders" : "Hips don't trail the shoulders") : st === "watch" ? "Shoulders may turn early" : "Shoulders turn before the hips",
         meas: lead >= 0 ? `Hips start turning ${lead.toFixed(2)} s before the shoulders` : `Shoulders start turning ${(-lead).toFixed(2)} s before the hips`,
@@ -987,7 +1084,7 @@ function analyzeSwing(c) {
   }
   // 6. front leg firm at contact (side)
   if (view === "side") {
-    let kC = -1, at = contact; for (let i = contact; i <= Math.min(T - 1, contact + 3); i++) { const a = ang3(K[i][G.hip], K[i][G.kn], K[i][G.an]); if (a > kC) { kC = a; at = i } }
+    let kC = -1, at = contact; for (let i = contact; i <= Math.min(T - 1, contact + F30(3)); i++) { const a = ang3(K[i][G.hip], K[i][G.kn], K[i][G.an]); if (a > kC) { kC = a; at = i } }
     const bad = kC >= 145 ? 0 : (145 - kC) / 15 + 1;
     const [st, ex] = st3(bad, 1, 2, 3);
     F.push({ id: "sFrontLeg", frame: at, moment: "Contact", status: st, extreme: ex,
@@ -999,7 +1096,7 @@ function analyzeSwing(c) {
   }
   // 7. extension through contact (side)
   if (view === "side") {
-    let eA = -1, at = contact; for (let i = contact; i <= Math.min(T - 1, contact + 4); i++) { const a = ang3(K[i][G.sh], K[i][G.el], K[i][G.wr]); if (a > eA) { eA = a; at = i } }
+    let eA = -1, at = contact; for (let i = contact; i <= Math.min(T - 1, contact + F30(4)); i++) { const a = ang3(K[i][G.sh], K[i][G.el], K[i][G.wr]); if (a > eA) { eA = a; at = i } }
     const bad = eA >= 155 ? 0 : (155 - eA) / 15 + 1;
     const [st, ex] = st3(bad, 1, 2, 3);
     F.push({ id: "sExtend", frame: at, moment: "Contact", status: st, extreme: ex,
@@ -1072,6 +1169,7 @@ function arrow(ctx, p0, p1, col, u, w) {
   ctx.beginPath(); ctx.moveTo(p1[0], p1[1]); ctx.lineTo(p1[0] - hd * Math.cos(a - 0.45), p1[1] - hd * Math.sin(a - 0.45)); ctx.lineTo(p1[0] - hd * Math.cos(a + 0.45), p1[1] - hd * Math.sin(a + 0.45)); ctx.closePath(); ctx.fill();
 }
 function drawAnn(ctx, c, f, kp, u) {
+  const FPS = fpsOf(c), F30 = (n) => Math.max(1, Math.round(n * FPS / 30));
   const torso = c.torso, dir = c.dir, S = sides(c.useHand);
   const side = c.useView === "side";
   const R = Math.max(26 * u, 0.32 * torso);
@@ -1278,7 +1376,7 @@ function compose(ctx, c, W, H, idx, opts) {
 }
 
 /* ---------------- on-screen player ---------------- */
-function idxAt(c, t) { return c.sm ? Math.max(0, Math.min(c.sm.length - 1, Math.round((t - c.fs0) * FPS))) : -1 }
+function idxAt(c, t) { return c.sm ? Math.max(0, Math.min(c.sm.length - 1, Math.round((t - c.fs0) * fpsOf(c)))) : -1 }
 function findingAt(c, idx) {
   if (!c.findings || !$("calloutChk").checked) return null;
   if (c.focus && c.focus.frame === idx) return c.focus;
@@ -1350,14 +1448,40 @@ function renderTabs() {
   $("workbench").hidden = state.clips.length === 0 || state.view === "all";
   $("combined").hidden = state.clips.length === 0 || state.view !== "all";
 }
+/* frame rate: watch a few decoded frames' timestamps. 50+ fps videos are analyzed at 60, everything else at 30 */
+async function detectFps() {
+  if (!("requestVideoFrameCallback" in HTMLVideoElement.prototype)) return 30;
+  const times = [];
+  try {
+    await seek(Math.min(0.2, video.duration / 4));
+    video.muted = true; video.playbackRate = 1;
+    await new Promise((resolve) => {
+      let done = false; const fin = () => { if (!done) { done = true; video.pause(); resolve() } };
+      const cb = (now, meta) => { times.push(meta.mediaTime); if (times.length >= 12) fin(); else video.requestVideoFrameCallback(cb) };
+      video.requestVideoFrameCallback(cb);
+      video.play().catch(fin); setTimeout(fin, 1500);
+    });
+  } catch (e) { return 30 }
+  const d = []; for (let i = 1; i < times.length; i++) { const x = times[i] - times[i - 1]; if (x > 0.002) d.push(x) }
+  if (d.length < 4) return 30;
+  const src = 1 / Math.min(...d.sort((a, b) => a - b).slice(0, Math.max(1, d.length >> 1)));
+  return src >= 50 ? 60 : 30;
+}
 async function ensureMeta(c) {
+  // once per clip; callers that arrive while it's running wait for the same result instead of fighting over the video
+  if (!c.metaPromise) c.metaPromise = (async () => {
+    await setVideo(c);
+    c.W = video.videoWidth; c.H = video.videoHeight;
+    const fps = await detectFps();
+    c.fps = fps; c.duration = video.duration;
+  })().catch((e) => { c.metaPromise = null; throw e });
+  await c.metaPromise;
   await setVideo(c);
-  c.W = video.videoWidth; c.H = video.videoHeight; c.duration = video.duration;
   if (!c.t1) c.t1 = Math.min(c.duration, 20);
 }
 async function selectClip(i) {
   stopPlay(); state.view = "clip"; state.active = i; renderTabs();
-  const c = clip(); if (!c) return;
+  const c = clip(); if (!c) return; const FPS = fpsOf(c);
   $("stageStatus").textContent = "";
   try {
     await ensureMeta(c);
@@ -1365,7 +1489,7 @@ async function selectClip(i) {
     stage.width = Math.round(c.W * k); stage.height = Math.round(c.H * k);
     $("nameIn").value = c.label; $("handSel").value = c.hand; $("viewSel").value = c.view;
     $("t0In").value = fmt(c.t0); $("t1In").value = fmt(c.t1); $("t1In").max = $("t0In").max = fmt(c.duration);
-    $("stageLabel").textContent = `${KIND_WORD[c.kind || "pitch"]} · ${c.name}`;
+    $("stageLabel").textContent = `${KIND_WORD[c.kind || "pitch"]} · ${c.name} · ${fpsOf(c)} fps analysis`;
     $("handLbl").textContent = isSwing(c) ? "Batting side" : "Throwing hand";
     $("viewSideOpt").textContent = isSwing(c) ? "Side (facing the hitter)" : "Side (1st or 3rd base)";
     $("viewBehindOpt").textContent = isSwing(c) ? "From the pitcher or catcher" : "Behind or in front";
@@ -1382,7 +1506,7 @@ function updateOptionLabels() {
 }
 function renderMarkers() {
   const c = clip(), box = $("markers"); box.innerHTML = "";
-  if (!c || !c.events) return;
+  if (!c || !c.events) return; const FPS = fpsOf(c);
   const names = MARKS[c.kind || "pitch"];
   for (const k of ["lift", "fs", "rel", "fin"]) {
     const t = c.fs0 + c.events[k] / FPS; const b = document.createElement("b");
@@ -1390,7 +1514,7 @@ function renderMarkers() {
   }
 }
 function renderReport() {
-  const c = clip(); const body = $("reportBody"), tally = $("tally");
+  const c = clip(); const body = $("reportBody"), tally = $("tally"); const FPS = fpsOf(c);
   $("reportTitle").textContent = c ? (c.label || c.name) : "Report";
   if (!c || !c.findings) {
     tally.innerHTML = "";
@@ -1409,7 +1533,11 @@ function renderReport() {
       <p>${esc(f.body)}</p>
       ${(f.drills || []).map((d) => { const D = DRILLS[d]; return `<details class="drill"><summary>${esc(D.name)} <span class="meas">· ${esc(doseOf(d, f.level))}</span></summary><ol>${D.steps.map((s) => `<li>${esc(s)}</li>`).join("")}</ol><div class="cue">Cue: "${esc(D.cue)}"</div></details>` }).join("")}
     </div>`).join("");
-  body.innerHTML = `<p class="eyebrow" style="margin-top:12px">Key moments · tap to view, ◀ ▶ to adjust</p><div class="moments">${chips}</div>
+  const q = c.quality, poor = q && (q.conf < 0.35 || q.fixed > 0.08);
+  const unsureSide = isSwing(c) && c.hand === "auto" && c.handConf < 0.25 && !c.handHint;
+  body.innerHTML = `${poor ? `<p class="note" style="border-left:4px solid var(--watch);padding-left:10px">Body tracking was weak on this clip (blur, low light, the player partly hidden or too small in the frame). Treat these results with caution, or film again closer, in better light and with the whole body in view.</p>` : ""}
+    ${unsureSide ? `<p class="note" style="border-left:4px solid var(--watch);padding-left:10px">From this angle it's hard to tell which side he bats from. It guessed ${c.useHand === "R" ? "right" : "left"}-handed. If that's wrong, change <b>Batting side</b> above. Adding a side-view clip of the same player also fixes this automatically.</p>` : ""}
+    <p class="eyebrow" style="margin-top:12px">Key moments · tap to view, ◀ ▶ to adjust</p><div class="moments">${chips}</div>
     <p class="eyebrow">Checks · ${c.useHand === "R" ? "right-handed" : "left-handed"} ${isSwing(c) ? "hitter" : "pitcher"}, ${viewName(c).toLowerCase()}</p>
     <div class="findings">${items}</div>
     <div class="actions">
@@ -1439,7 +1567,7 @@ function renderReport() {
   const cl = body.querySelector("[data-combined]"); if (cl) cl.onclick = () => selectAll();
 }
 function nudge(k, d) {
-  const c = clip(); const E = c.events; const T = c.sm.length;
+  const c = clip(); const E = c.events; const T = c.sm.length; const FPS = fpsOf(c);
   E[k] = Math.max(0, Math.min(T - 1, E[k] + d));
   if (E.fs <= E.lift) E.fs = Math.min(T - 1, E.lift + 1);
   if (E.rel <= E.fs) E.rel = Math.min(T - 1, E.fs + 1);
@@ -1447,6 +1575,20 @@ function nudge(k, d) {
   c.focus = null; analyze(c); renderReport(); renderMarkers(); showFrame(c.fs0 + E[k] / FPS);
 }
 
+/* a swing filmed from the pitcher's or catcher's side can hide which shoulder the hands are by;
+   use the batting side the same player's clearer clips agree on */
+function resolveHands() {
+  for (const g of groups()) {
+    if (g.kind !== "swing") continue;
+    const sure = g.clips.filter((c) => c.findings && c.handConf >= 0.3);
+    const votes = { R: 0, L: 0 }; sure.forEach((c) => votes[c.autoHand]++);
+    const maj = votes.R > votes.L ? "R" : votes.L > votes.R ? "L" : null;
+    for (const c of g.clips) {
+      if (!c.sm || c.hand !== "auto" || !(c.handConf < 0.25) || !maj || c.handHint === maj) continue;
+      c.handHint = maj; detectEvents(c); analyze(c);
+    }
+  }
+}
 async function analyzeClip(c, onProgress) {
   await ensureMeta(c);
   c.status = "busy"; renderTabs();
@@ -1455,6 +1597,7 @@ async function analyzeClip(c, onProgress) {
     await trackClip(c, onProgress);
     detectEvents(c); analyze(c);
     c.status = "done"; c.focus = null;
+    resolveHands();
   } catch (e) { c.status = "error"; c.error = e.message || String(e); throw e }
   finally { renderTabs() }
 }
@@ -1471,7 +1614,7 @@ async function runAnalysis() {
     prog.hidden = true; $("stageStatus").textContent = "";
     if (state.view === "clip" && clip() === c) {
       renderMarkers(); renderReport(); updateOptionLabels();
-      const first = c.sorted[0]; await showFrame(c.fs0 + (first ? first.frame : c.events.fs) / FPS);
+      const first = c.sorted[0]; await showFrame(c.fs0 + (first ? first.frame : c.events.fs) / fpsOf(c));
     }
   } catch (e) {
     prog.hidden = true; $("stageStatus").textContent = e.message || String(e);
@@ -1610,7 +1753,7 @@ function renderCombined() {
   });
   root.querySelectorAll(".evrow").forEach((b) => b.onclick = async () => {
     const ci = +b.dataset.c; await selectClip(ci); const c = clip(); if (!c || !c.findings) return;
-    const f = c.findings.find((x) => x.id === b.dataset.id); if (f) { c.focus = f; $("calloutChk").checked = true; showFrame(c.fs0 + f.frame / FPS) }
+    const f = c.findings.find((x) => x.id === b.dataset.id); if (f) { c.focus = f; $("calloutChk").checked = true; showFrame(c.fs0 + f.frame / fpsOf(c)) }
   });
 }
 
@@ -1622,7 +1765,7 @@ async function pickCodec(W, H, bitrate) {
   if (!window.VideoEncoder) return null;
   const tries = [["avc1.640033", "avc"], ["avc1.4d0033", "avc"], ["vp09.00.40.08", "vp9"]];
   for (const [codec, mux] of tries) {
-    const cfg = { codec, width: W, height: H, bitrate, framerate: FPS };
+    const cfg = { codec, width: W, height: H, bitrate, framerate: OUT_FPS };
     if (mux === "avc") cfg.avc = { format: "avc" };
     try { const s = await VideoEncoder.isConfigSupported(cfg); if (s.supported) return { cfg, mux } } catch (e) {}
   }
@@ -1632,18 +1775,25 @@ const subOf = (c) => `${c.useHand === "R" ? "Right" : "Left"}-handed ${isSwing(c
 /* real-speed pass, then slow motion with a freeze-frame callout at each finding */
 async function renderClip(c, ctx, W, H, emit, prog) {
   await setVideo(c);
+  const FPS = fpsOf(c), step = FPS / OUT_FPS;            // source frames per output frame at real speed
+  const slowRep = Math.max(1, Math.round(4 * OUT_FPS / FPS)); // output frames per source frame at quarter speed
   const E = c.events, T = c.sm.length, banner = [c.label || c.name, subOf(c)];
   const a = Math.max(0, E.lift - Math.round(1.0 * FPS)), b = Math.min(T - 1, E.fin + Math.round(0.6 * FPS));
   const s0 = Math.max(0, E.lift - Math.round(0.25 * FPS)), s1 = Math.min(T - 1, E.fin + Math.round(0.25 * FPS));
   const freezes = new Map();
   for (const f of freezeList(c)) { const fr = Math.max(s0, Math.min(s1, f.frame)); if (!freezes.has(fr)) freezes.set(fr, []); freezes.get(fr).push(f) }
-  for (let i = a; i <= b; i++) { await seek(c.fs0 + i / FPS); compose(ctx, c, W, H, i, { skeleton: true, banner, chip: "REAL SPEED", chipCol: "#ffffff" }); await emit(); if (i % 10 === 0) prog() }
+  let k = 0;
+  for (let x = a; x <= b; x += step) { const i = Math.round(x); await seek(c.fs0 + i / FPS); compose(ctx, c, W, H, i, { skeleton: true, banner, chip: "REAL SPEED", chipCol: "#ffffff" }); await emit(); if (k++ % 10 === 0) prog() }
+  // quarter speed: at 60 fps each source frame is shown twice, at 30 fps four times; at 120+ some frames are skipped
+  const sstep = Math.max(1, Math.round(FPS / (4 * OUT_FPS)));
   for (let i = s0; i <= s1; i++) {
+    const isFreeze = freezes.has(i);
+    if ((i - s0) % sstep !== 0 && !isFreeze) continue;
     await seek(c.fs0 + i / FPS);
     compose(ctx, c, W, H, i, { skeleton: true, banner, chip: "SLOW MO ¼×", chipCol: "#8fbaff" });
-    for (let r = 0; r < 4; r++) await emit();
+    for (let r = 0; r < slowRep; r++) await emit();
     for (const f of freezes.get(i) || []) {
-      const hold = Math.round(holdOf(f) * FPS);
+      const hold = Math.round(holdOf(f) * OUT_FPS);
       for (let s = 0; s < hold; s++) {
         const fade = Math.min(1, s / 8);
         compose(ctx, c, W, H, i, { skeleton: true, finding: f, dim: 0.22 * fade, showAnn: s >= 4, panel: s >= 4, panelAlpha: Math.min(1, (s - 3) / 5), banner,
@@ -1654,20 +1804,22 @@ async function renderClip(c, ctx, W, H, emit, prog) {
     }
   }
 }
-/* freeze on every flagged check plus the arm-slot note; good checks go on the summary card instead */
+/* freeze on every flagged check plus the notes; good checks go on the summary card instead */
 function freezeList(c) {
   const fl = c.findings.filter((f) => f.status !== "good" || f.info);
-  return (fl.length ? fl : c.findings.filter((f) => f.id === "balance")).sort((x, y) => x.frame - y.frame);
+  return (fl.length ? fl : c.findings.filter((f) => f.id === "balance" || f.id === "sBalance")).sort((x, y) => x.frame - y.frame);
 }
 const holdOf = (f) => f.info ? 2.6 : f.status === "fix" ? 4.4 : f.status === "watch" ? 3.8 : 3;
 function clipFrames(c) {
+  const FPS = fpsOf(c);
   const E = c.events, T = c.sm.length;
   const a = Math.max(0, E.lift - Math.round(1.0 * FPS)), b = Math.min(T - 1, E.fin + Math.round(0.6 * FPS));
   const s0 = Math.max(0, E.lift - Math.round(0.25 * FPS)), s1 = Math.min(T - 1, E.fin + Math.round(0.25 * FPS));
-  return (b - a + 1) + (s1 - s0 + 1) * 4 + freezeList(c).reduce((t, f) => t + Math.round(holdOf(f) * FPS), 0);
+  return Math.round(((b - a + 1) + (s1 - s0 + 1) * 4) * OUT_FPS / FPS) + freezeList(c).reduce((t, f) => t + Math.round(holdOf(f) * OUT_FPS), 0);
 }
 /* blurred backdrop from a clip frame (or plain dark) */
 async function backdrop(ctx, W, H, c, idx) {
+  const FPS = fpsOf(c);
   ctx.fillStyle = "#0b0f0d"; ctx.fillRect(0, 0, W, H);
   if (c) { await setVideo(c); await seek(c.fs0 + idx / FPS); const k = Math.max(W / c.W, H / c.H); ctx.filter = "blur(18px)"; ctx.drawImage(video, (W - c.W * k) / 2, (H - c.H * k) / 2, c.W * k, c.H * k); ctx.filter = "none" }
   ctx.fillStyle = "rgba(8,11,18,.8)"; ctx.fillRect(0, 0, W, H);
@@ -1729,22 +1881,23 @@ async function exportClips(clips, single, g, stEl, btnEl) {
   state.busy = true; btn.disabled = true; st.textContent = "Rendering…";
   await fontsReady();
   const cv = document.createElement("canvas"); cv.width = W; cv.height = H; const ctx = cv.getContext("2d");
-  const muxer = new Mp4Muxer.Muxer({ target: new Mp4Muxer.ArrayBufferTarget(), video: { codec: codec.mux, width: W, height: H, frameRate: FPS }, fastStart: "in-memory" });
+  const muxer = new Mp4Muxer.Muxer({ target: new Mp4Muxer.ArrayBufferTarget(), video: { codec: codec.mux, width: W, height: H, frameRate: OUT_FPS }, fastStart: "in-memory" });
   let encErr = null;
   const enc = new VideoEncoder({ output: (chunk, meta) => muxer.addVideoChunk(chunk, meta), error: (e) => { encErr = e } });
   enc.configure(codec.cfg);
   let n = 0;
   const emit = async () => {
-    const fr = new VideoFrame(cv, { timestamp: Math.round(n * 1e6 / FPS), duration: Math.round(1e6 / FPS) });
+    const fr = new VideoFrame(cv, { timestamp: Math.round(n * 1e6 / OUT_FPS), duration: Math.round(1e6 / OUT_FPS) });
     enc.encode(fr, { keyFrame: n % 60 === 0 }); fr.close(); n++;
     if (enc.encodeQueueSize > 8) await new Promise((r) => setTimeout(r, 0));
     while (enc.encodeQueueSize > 16) await new Promise((r) => setTimeout(r, 5));
     if (encErr) throw encErr;
   };
-  const hold = async (sec) => { for (let s = 0; s < Math.round(sec * FPS); s++) await emit() };
-  const total = clips.reduce((t, c) => t + clipFrames(c), 0) + (single ? 7 * FPS : (3 + clips.length * 1.6 + 9) * FPS);
+  const hold = async (sec) => { for (let s = 0; s < Math.round(sec * OUT_FPS); s++) await emit() };
+  let total = 0;
   const prog = () => { st.textContent = `Rendering frame ${n} of about ${Math.round(total)}…` };
   try {
+    total = clips.reduce((t, c) => t + clipFrames(c), 0) + (single ? 7 * OUT_FPS : (3 + clips.length * 1.6 + 9) * OUT_FPS);
     let title, sub, items, keep, filename;
     if (single) {
       const c = single;
@@ -1937,8 +2090,8 @@ $("playBtn").onclick = async () => {
 video.addEventListener("ended", () => stopPlay());
 $("slowChk").onchange = () => { video.playbackRate = $("slowChk").checked ? 0.25 : 1 };
 $("skelChk").onchange = renderStage; $("calloutChk").onchange = () => { const c = clip(); if (c) c.focus = null; renderStage() };
-$("stepBack").onclick = () => { const c = clip(); if (c) { c.focus = null; showFrame(Math.max(0, video.currentTime - 1 / FPS)) } };
-$("stepFwd").onclick = () => { const c = clip(); if (c) { c.focus = null; showFrame(Math.min(video.duration, video.currentTime + 1 / FPS)) } };
+$("stepBack").onclick = () => { const c = clip(); if (c) { c.focus = null; showFrame(Math.max(0, video.currentTime - 1 / fpsOf(c))) } };
+$("stepFwd").onclick = () => { const c = clip(); if (c) { c.focus = null; showFrame(Math.min(video.duration, video.currentTime + 1 / fpsOf(c))) } };
 $("scrub").addEventListener("input", async (e) => { scrubbing = true; const c = clip(); if (!c) return; c.focus = null; stopPlay(); await seek(+e.target.value / 1000 * video.duration); renderStage() });
 $("scrub").addEventListener("change", () => { scrubbing = false });
 $("analyzeBtn").onclick = runAnalysis;
