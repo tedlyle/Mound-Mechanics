@@ -847,24 +847,30 @@ function analyzePitch(c) {
 function detectSwingEvents(c) {
   const K = c.sm, T = K.length;
   const torso = median(K.map((f) => dist(mid(f[5], f[6]), mid(f[11], f[12])))) || 1;
-  const disp = (k) => { const m = [median(K.map((f) => f[k][0])), median(K.map((f) => f[k][1]))]; return pct(K.map((f) => dist(f[k], m)), 0.95) };
-  c.autoHand = disp(15) >= disp(16) ? "R" : "L"; // the striding foot is the lead foot
-  const hand = c.hand === "auto" ? c.autoHand : c.hand, S = sides(hand);
   const hands = (i) => mid(K[i][9], K[i][10]);
+  // batting side: in the stance the hands sit by the back shoulder (right shoulder for a right-handed hitter)
+  const early = K.slice(0, Math.max(3, Math.min(T, Math.round(0.4 * FPS))));
+  const dR = median(early.map((f) => dist(mid(f[9], f[10]), f[6]))), dL = median(early.map((f) => dist(mid(f[9], f[10]), f[5])));
+  const disp = (k) => { const m = [median(K.map((f) => f[k][0])), median(K.map((f) => f[k][1]))]; return pct(K.map((f) => dist(f[k], m)), 0.95) };
+  c.autoHand = Math.abs(dR - dL) > 0.15 * torso ? (dR < dL ? "R" : "L") : (disp(15) >= disp(16) ? "R" : "L");
+  const hand = c.hand === "auto" ? c.autoHand : c.hand, S = sides(hand);
   const hv = K.map((f, i) => i ? dist(hands(i), hands(i - 1)) / torso : 0);
   const v = hv.map((_, i) => (hv[Math.max(0, i - 1)] + hv[i] + hv[Math.min(T - 1, i + 1)]) / 3);
   let contact = 2, pk = -1; for (let i = 2; i < T - 2; i++) if (v[i] > pk) { pk = v[i]; contact = i }
   let launch = contact; while (launch > 1 && v[launch - 1] > 0.25 * pk) launch--;
   const win0 = Math.max(0, launch - Math.round(1.0 * FPS));
-  // foot plant: the lead foot's own stride motion settles (hitters' strides are small, so this is relative to its peak speed)
-  const av = speedSeries(K, S.g.an, torso);
-  const top = Math.min(contact - 1, launch + 2);
-  let peak = 0; for (let i = win0; i <= top; i++) peak = Math.max(peak, av[i]);
-  let plant = launch;
-  if (peak > 0.012) for (let i = top; i >= win0; i--) if (av[i] > 0.3 * peak) { plant = Math.min(contact - 1, i + 1); break }
+  // foot plant: the lead foot has covered 90% of its stride (strides are small, so this is relative to its own travel)
+  // walk back from the start of the swing while the front foot stays where it ends up (one stray frame allowed)
+  const aL = K[launch][S.g.an]; let plant = launch, misses = 0;
+  for (let i = launch - 1; i >= win0; i--) { if (dist(K[i][S.g.an], aL) <= 0.06 * torso) { plant = i; misses = 0 } else if (++misses > 1) break }
+  let travel = 0; for (let i = win0; i < plant; i++) travel = Math.max(travel, dist(K[i][S.g.an], aL));
+  c.noStride = travel < 0.12 * torso || plant <= win0;
+  if (c.noStride) plant = launch;
+  plant = Math.min(plant, contact - 1);
   if (plant <= 0) plant = Math.max(1, launch);
   // load: hands farthest back from the lead shoulder, at or before foot plant
-  let load = win0, best = -1; for (let i = win0; i <= Math.max(win0, plant - 1); i++) { const d = dist(hands(i), K[i][S.g.sh]); if (d > best) { best = d; load = i } }
+  const lw0 = Math.max(win0, plant - Math.round(0.45 * FPS));
+  let load = lw0, best = -1; for (let i = lw0; i <= Math.max(lw0, plant - 1); i++) { const d = dist(hands(i), K[i][S.g.sh]); if (d > best) { best = d; load = i } }
   if (load >= plant) load = Math.max(0, plant - 1);
   let rel = contact; if (rel <= plant) rel = Math.min(T - 1, plant + 1);
   const fin = Math.min(T - 1, rel + Math.round(0.35 * FPS));
@@ -881,8 +887,8 @@ function analyzeSwing(c) {
   const st3 = (bad, watchT, fixT, heavyT) => bad >= heavyT ? ["fix", true] : bad >= fixT ? ["fix", false] : bad >= watchT ? ["watch", false] : ["good", false];
   const pre = K.slice(0, Math.max(1, plant));
   const height = pct(pre.map((f) => Math.max(f[15][1], f[16][1]) - f[0][1]), 0.9) * 1.1 || torso * 3.3;
-  const shW = Math.abs(K[load][5][0] - K[load][6][0]) / torso;
-  const autoView = shW > 0.45 ? "side" : "behind";
+  const shW = median(K.slice(0, Math.max(2, (c.launch || plant) - 5)).map((f) => Math.abs(f[5][0] - f[6][0]))) / torso;
+  const autoView = shW > 0.35 ? "side" : "behind";
   const view = c.view === "auto" ? autoView : c.view;
   const pdir = Math.sign(K[plant][G.an][0] - K[plant][Tt.an][0]) || 1;
   c.autoView = autoView; c.useHand = hand; c.useView = view; c.height = height; c.dir = pdir;
@@ -952,25 +958,37 @@ function analyzeSwing(c) {
   }
   // 5. hips lead the shoulders (side)
   if (view === "side") {
-    const hw = (i) => Math.abs(K[i][11][0] - K[i][12][0]), sw = (i) => Math.abs(K[i][5][0] - K[i][6][0]);
-    let hb = 0, sb = 0; for (let i = Math.max(0, load - 3); i <= Math.min(T - 1, load + 3); i++) { hb = Math.max(hb, hw(i)); sb = Math.max(sb, sw(i)) }
-    let hs = -1, ss = -1;
-    for (let i = load; i <= Math.min(T - 1, contact + 3); i++) { if (hs < 0 && hw(i) < 0.85 * hb) hs = i; if (ss < 0 && sw(i) < 0.85 * sb) ss = i }
-    if (hs >= 0 && ss >= 0) {
-      const lead = (ss - hs) / FPS;
-      const st = lead >= 0.03 ? "good" : lead > -0.03 ? "watch" : "fix";
-      F.push({ id: "sSeq", frame: Math.min(hs, ss), moment: "Launch", status: st, extreme: lead <= -0.07,
-        title: st === "good" ? "Hips lead the shoulders" : st === "watch" ? "Hips and shoulders turn together" : "Shoulders turn before the hips",
+    const sm5 = (fn) => (i) => { let t = 0, n = 0; for (let j = Math.max(0, i - 2); j <= Math.min(T - 1, i + 2); j++) { t += fn(j); n++ } return t / n };
+    const hw = sm5((i) => Math.abs(K[i][11][0] - K[i][12][0])), sw = sm5((i) => Math.abs(K[i][5][0] - K[i][6][0]));
+    // each line's apparent width shrinks as it turns toward the pitcher; time when each has made 25% of its own turn,
+    // interpolated between frames because the gap is often less than one frame at 30 fps
+    const e1 = Math.min(T - 1, contact + 6);
+    const cross = (wf) => {
+      const w0 = median([Math.max(0, load - 2), load, Math.min(T - 1, load + 1)].map(wf)), w1 = Math.min(...[e1 - 1, e1].map(wf));
+      if (w0 - w1 < 0.07 * torso) return null; // too little visible turn to time reliably
+      const thr = w0 - 0.25 * (w0 - w1);
+      for (let i = load + 1; i <= e1; i++) if (wf(i) <= thr) { const a = wf(i - 1), b = wf(i); return i - 1 + (a - thr) / Math.max(1e-6, a - b) }
+      return null;
+    };
+    const hsF = cross(hw), ssF = cross(sw);
+    if (hsF != null && ssF != null) {
+      const hs = Math.round(hsF), ss = Math.round(ssF);
+      const lead = (ssF - hsF) / FPS;
+      // differences under about one frame can't be resolved at 30 fps, so only flag clear shoulder-first timing
+      const st = lead >= -0.005 ? "good" : lead > -0.04 ? "watch" : "fix";
+      F.push({ id: "sSeq", frame: Math.min(hs, ss), moment: "Launch", status: st, extreme: lead <= -0.08,
+        title: st === "good" ? (lead >= 0.015 ? "Hips lead the shoulders" : "Hips don't trail the shoulders") : st === "watch" ? "Shoulders may turn early" : "Shoulders turn before the hips",
         meas: lead >= 0 ? `Hips start turning ${lead.toFixed(2)} s before the shoulders` : `Shoulders start turning ${(-lead).toFixed(2)} s before the hips`,
         body: st === "good" ? "The hips start to open before the shoulders, which stretches the core and adds bat speed."
-          : "The shoulders start turning as early as or earlier than the hips. Without that hip-to-shoulder separation he swings with the arms and loses bat speed and plate coverage.",
+          : st === "watch" ? "The hips and shoulders start turning at about the same time. Ideally the hips go first and the shoulders follow a split second later. At 30 frames per second this gap is hard to see, so filming in slow motion makes this check more reliable."
+          : "The shoulders start turning before the hips. Without that hip-to-shoulder separation he swings with the arms and loses bat speed and plate coverage.",
         drills: st === "good" ? [] : ["hBatBehindBack", "hSeparation"], ann: [{ t: "seq", hs, ss, col: st }], hl: [[11, 12], [5, 6]] });
     }
   }
   // 6. front leg firm at contact (side)
   if (view === "side") {
     let kC = -1, at = contact; for (let i = contact; i <= Math.min(T - 1, contact + 3); i++) { const a = ang3(K[i][G.hip], K[i][G.kn], K[i][G.an]); if (a > kC) { kC = a; at = i } }
-    const bad = kC >= 150 ? 0 : (150 - kC) / 15 + 1;
+    const bad = kC >= 145 ? 0 : (145 - kC) / 15 + 1;
     const [st, ex] = st3(bad, 1, 2, 3);
     F.push({ id: "sFrontLeg", frame: at, moment: "Contact", status: st, extreme: ex,
       title: st === "good" ? "Firm front side at contact" : "Soft front knee at contact",
@@ -1014,7 +1032,7 @@ function analyzeSwing(c) {
   {
     const lc = (contact - load) / FPS, pc = (contact - plant) / FPS;
     F.push({ id: "sTiming", frame: plant, moment: "Timing", status: "good", info: true,
-      title: "Swing timing", meas: `Load → contact ${lc.toFixed(2)} s · foot plant → contact ${pc.toFixed(2)} s`,
+      title: "Swing timing", meas: c.noStride ? `Load → contact ${lc.toFixed(2)} s · no stride detected` : `Load → contact ${lc.toFixed(2)} s · foot plant → contact ${pc.toFixed(2)} s`,
       body: "For reference. Compare these times across clips. A swing that repeats has similar times every time.",
       drills: [], ann: [{ t: "tempo", tl: lc, tr: pc, labels: ["load → contact", "foot plant → contact"] }] });
   }
@@ -1733,7 +1751,7 @@ async function exportClips(clips, single, g, stEl, btnEl) {
       await renderClip(c, ctx, W, H, emit, prog);
       title = c.label || c.name; sub = subOf(c);
       items = c.sorted.filter((f) => f.status !== "good").map((f) => ({ title: f.title, status: f.status, detail: f.drills.map((d) => DRILLS[d].name).join(", ") }));
-      keep = c.sorted.filter((f) => f.status === "good").map((f) => f.title).join(" · ");
+      keep = c.sorted.filter((f) => f.status === "good" && !f.info).map((f) => f.title).join(" · ");
       filename = `${safeName(c.label ? c.label + " " + c.name : c.name)}_annotated.mp4`;
       await backdrop(ctx, W, H, c, c.events.fin);
     } else {
