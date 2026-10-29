@@ -162,6 +162,15 @@ details.clipSettings > summary::after { content: "+"; font: 600 1.2rem var(--f-b
 details.clipSettings[open] > summary::after { content: "–" }
 .primaryActions { margin-top: 12px; display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 10px; align-items: end }
 .primaryActions .btn { min-height: 42px }
+/* 3D view */
+.v3dBtn { font: 800 .92rem var(--f-display); letter-spacing: .02em }
+.v3dBtn[aria-pressed="true"] { background: var(--accent); color: var(--accent-ink); border-color: var(--accent) }
+.v3dBar { margin-top: 8px; display: grid; gap: 6px }
+.v3dBar .note { margin: 0 }
+.v3dPresets { display: flex; gap: 6px; flex-wrap: wrap }
+.v3dPresets button { border: 1px solid var(--line); background: var(--surface); color: var(--ink); border-radius: 999px; padding: 6px 12px; font: 600 .82rem var(--f-body); cursor: pointer; min-height: 34px }
+.v3dPresets button[aria-pressed="true"] { background: var(--ink); color: var(--bg); border-color: var(--ink) }
+#stage.is3d { cursor: grab; touch-action: none }
 /* history + save */
 .savePanel { margin-top: 16px; border-top: 1px solid var(--line); padding-top: 12px; display: grid; gap: 8px }
 .saveRow { display: flex; gap: 10px; align-items: end; flex-wrap: wrap }
@@ -353,8 +362,13 @@ nav.clips { display: flex; gap: 8px; flex-wrap: wrap; align-items: center }
         <button class="btn icon" id="playBtn" type="button" aria-label="Play"><svg viewBox="0 0 24 24" aria-hidden="true"><path id="playIcon" d="M8 5v14l11-7z"/></svg></button>
         <button class="btn icon" id="stepBack" type="button" aria-label="Previous frame"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6h2v12H6zm3.5 6 8.5 6V6z"/></svg></button>
         <button class="btn icon" id="stepFwd" type="button" aria-label="Next frame"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M16 6h2v12h-2zM6 18l8.5-6L6 6z"/></svg></button>
+        <button class="btn icon v3dBtn" id="v3dBtn" type="button" aria-pressed="false" aria-label="3D view">3D</button>
         <input type="range" id="scrub" min="0" max="1000" value="0" step="1" aria-label="Scrub through clip">
         <span class="time" id="timeLbl">0.00 s</span>
+      </div>
+      <div class="v3dBar" id="v3dBar" hidden>
+        <div class="v3dPresets" id="v3dPresets" role="group" aria-label="3D view angle"></div>
+        <p class="note">Drag the picture to turn it · pinch or scroll to zoom · it plays with the video</p>
       </div>
       <div class="markers" id="markers" aria-hidden="true"></div>
       <div id="momentsBox" hidden>
@@ -512,6 +526,11 @@ const DRILLS = {
     steps: ["Play catch with a junior-size football at 30 to 45 feet.",
             "A football only spirals with a clean arm path: elbow at shoulder height, hand on top of the ball.",
             "Follow with 5 baseball throws using the same arm feel."], cue: "Make it spiral." },
+  sepHold: { dose: ["1 set of 8", "2 sets of 8", "3 sets of 8, every practice"], name: "Separation Holds", reps: "2 sets of 8",
+    steps: ["Get into the stride position at foot strike: feet at stride length, front shoulder and glove pointed at the target.",
+            "Turn the belt buckle toward the plate while the front shoulder stays closed. Feel the stretch across the stomach.",
+            "Hold that for a 2-count, then let the shoulders turn through and throw softly.",
+            "Once it feels natural, do it from a full delivery with no pause."], cue: "Hips open, shoulder stays closed." },
   rhythmCount: { dose: ["5 dry reps, then 5 throws", "10 dry reps, then 10 throws", "15 dry reps, then 15 throws, daily"], name: "Rhythm Count Drill", reps: "10 dry reps, then 10 throws",
     steps: ["Count \"one\" at the start of the leg lift, \"two\" at the top, \"three\" as the front foot lands.",
             "Keep the beats even. Use a slow count if he rushes, a quicker count if he drifts.",
@@ -1111,6 +1130,40 @@ function analyzePitch(c) {
         : "The hips slide toward the plate before the knee reaches the top. Drifting early makes him rush and land before the arm is ready.",
       drills: st === "good" ? [] : ["liftPause", "balanceHold"], ann: [{ t: "hipPath", from: ls, to: lift, col: st }] });
   }
+  // 16. hip-to-shoulder separation (side view): from the top of the lift, the hips should start opening toward the plate
+  //     before the shoulders, and the shoulders should still be closed when the front foot lands.
+  //     From the side, each line looks widest while closed and narrowest once it faces the plate, so each one's "turn" is
+  //     timed from how its apparent width shrinks, the same way the hitting check times hips vs shoulders.
+  if (view === "side") {
+    const sm5 = (fn) => (i) => { let t = 0, n = 0; for (let j = Math.max(0, i - F30(2)); j <= Math.min(T - 1, i + F30(2)); j++) { t += fn(j); n++ } return t / n };
+    const hw = sm5((i) => Math.abs(K[i][11][0] - K[i][12][0])), sw = sm5((i) => Math.abs(K[i][5][0] - K[i][6][0]));
+    const b1 = Math.min(T - 1, rel + Math.round(0.2 * FPS));
+    const turn = (wf) => {
+      let ci = lift, cv = -1; for (let i = lift; i <= fs; i++) if (wf(i) > cv) { cv = wf(i); ci = i }
+      let ov = Infinity; for (let i = fs; i <= b1; i++) ov = Math.min(ov, wf(i));
+      if (cv - ov < 0.08 * torso) return null; // too little visible turn to time reliably
+      const frac = (i) => (cv - wf(i)) / (cv - ov);
+      let tc = null;
+      for (let i = ci + 1; i <= b1; i++) if (frac(i) >= 0.25) { const a = frac(i - 1), b = frac(i); tc = i - 1 + (0.25 - a) / Math.max(1e-6, b - a); break }
+      return tc == null ? null : { tc, atFs: Math.max(0, Math.min(1, frac(fs))) };
+    };
+    const Hs = turn(hw), Ss = turn(sw);
+    if (Hs && Ss) {
+      const lead = (Ss.tc - Hs.tc) / FPS, sOpen = Ss.atFs, hOpen = Hs.atFs;
+      // under about one frame (0.03 s at 30 fps) the order can't be resolved, so "good" needs a visible lead
+      const st = lead <= -0.03 || sOpen >= 0.5 ? "fix" : lead >= 0.02 && sOpen < 0.3 ? "good" : "watch";
+      const early = sOpen >= 0.5;
+      F.push({ id: "sep", frame: fs, moment: "Foot strike", status: st, extreme: lead <= -0.07 || sOpen >= 0.75,
+        title: st === "good" ? "Hips lead the shoulders" : st === "watch" ? "Hips and shoulders open together" : early ? "Shoulders open before foot strike" : "Shoulders turn before the hips",
+        meas: `At foot strike: hips ${Math.round(hOpen * 100)}% open, shoulders ${Math.round(sOpen * 100)}% open · ` + (lead >= 0 ? `hips start turning ${lead.toFixed(2)} s first` : `shoulders start turning ${(-lead).toFixed(2)} s first`),
+        body: st === "good" ? "The hips start opening toward the plate before the shoulders, and the front shoulder is still closed when the foot lands. That stretch between the hips and chest is where a lot of velocity comes from."
+          : st === "watch" ? "The hips and shoulders open at about the same time. Ideally the hips start turning first while the front shoulder stays closed until the foot lands. At 30 frames per second the gap is hard to time, so slow-motion (60 fps) video makes this check more reliable."
+          : early ? "The shoulders are already turning toward the plate when the front foot lands. Opening early loses the hip-to-shoulder stretch, costs velocity and puts more of the work on the arm."
+          : "The shoulders start turning before the hips. Without that hip-to-shoulder separation the arm has to do more of the work, which costs velocity and adds stress.",
+        drills: st === "good" ? [] : early ? ["sepHold", "gloveHolds"] : ["sepHold", "hipLead"],
+        ann: [{ t: "seq", hs: Math.round(Hs.tc), ss: Math.round(Ss.tc), col: st }], hl: [[11, 12], [5, 6]] });
+    }
+  }
   for (const f of F) f.level = f.status === "good" ? null : f.status === "watch" ? "light" : f.extreme ? "heavy" : "standard";
   const order = { fix: 0, watch: 1, good: 2 };
   c.findings = F;
@@ -1608,6 +1661,7 @@ function renderStage() {
   const c = clip(); if (!c || (!c.noVideo && (!video.videoWidth || video.src !== c.url))) return;
   const [W, H] = [stage.width, stage.height];
   const idx = idxAt(c, curT(c));
+  if (state.v3d && c.p3) { render3D(sctx, c, W, H, idx); $("timeLbl").textContent = fmt(curT(c)) + " s"; if (!scrubbing) $("scrub").value = Math.round((curT(c) / durOf(c)) * 1000); return }
   const f = state.playing ? null : findingAt(c, idx);
   compose(sctx, c, W, H, idx, { skeleton: $("skelChk").checked && idx >= 0, finding: f, dim: f ? 0.18 : 0, banner: null, panel: !!f });
   $("timeLbl").textContent = fmt(curT(c)) + " s";
@@ -1765,6 +1819,7 @@ async function selectClip(i) {
     if (ticket !== selTicket) return;
     $("analyzeBtn").disabled = !!c.noVideo; $("tapBtn").disabled = !!c.noVideo;
     $("stageStatus").textContent = c.noVideo ? "Opened from history without its video: the body tracking is shown on its own. Key moments can still be adjusted." : $("stageStatus").textContent;
+    syncV3d(c);
     renderStage(); renderMarkers(); renderReport(); updateOptionLabels();
     if (state.m !== "video" && state.m !== "report") setMode("video"); else updateAppTitle();
   } catch (e) { if (ticket !== selTicket) return; if (c.status !== "done") c.status = "error"; renderTabs(); $("stageStatus").textContent = e.message }
@@ -1911,6 +1966,7 @@ async function analyzeClip(c, onProgress) {
   try {
     await loadModel();
     await trackClip(c, onProgress);
+    c.p3 = null; if (clip() === c) { state.v3d = false; syncV3d(c) }
     detectEvents(c); analyze(c);
     c.status = "done"; c.focus = null;
     resolveHands();
@@ -1961,7 +2017,7 @@ const CHECKS = {
   kneeBrace: { name: "Front knee at release", need: "side" },
   strideDir: { name: "Stride direction", need: "behind" }, stride: { name: "Stride length", need: "side" },
   armUp: { name: "Arm timing at foot strike", need: "side" }, trunkRel: { name: "Posture at release", need: "any" },
-  drift: { name: "Early drift", need: "side" }, head: { name: "Head stability", need: "any" },
+  drift: { name: "Early drift", need: "side" }, sep: { name: "Hips before shoulders", need: "side" }, head: { name: "Head stability", need: "any" },
   tempo: { name: "Tempo", need: "any" }, balance: { name: "Balance at the top", need: "any" },
   slot: { name: "Arm slot", need: "behind" }, release: { name: "Release point", need: "side" }
 };
@@ -2396,6 +2452,155 @@ function copyText(text, st, ta) {
   try { navigator.clipboard.writeText(text).then(() => { st.textContent = "Drill plan copied." }, fallback) } catch (e) { fallback() }
 }
 
+/* ---------------- 3D view ----------------
+   A second body model (MediaPipe Pose, Apache-2.0) estimates each joint's position in 3D, in meters, from a single camera.
+   It runs on demand over the part of the clip around the pitch or swing, using the 2D tracking to crop around the player.
+   The 3D shape comes from the model; forward and sideways travel come from the 2D tracking, so depth travel toward or
+   away from the camera isn't shown. Everything is drawn on the main canvas so it shares the video's timeline. */
+const MP_VER = "0.5.1675469404";
+const M3 = { lSh: 11, rSh: 12, lEl: 13, rEl: 14, lWr: 15, rWr: 16, lHip: 23, rHip: 24, lKn: 25, rKn: 26, lAn: 27, rAn: 28, lHe: 29, rHe: 30, lFt: 31, rFt: 32, lEar: 7, rEar: 8, nose: 0 };
+function mpUrl(f) {
+  // the website and the artifact host the model files next to the page; the offline file fetches them from the CDN
+  const local = location.protocol !== "file:" && !window.MOUNDCHECK_EMBEDDED_MODEL;
+  return local ? new URL("mp/" + f + (/\.(js|wasm)$/.test(f) ? "" : ".wasm"), location.href).href : `https://cdn.jsdelivr.net/npm/@mediapipe/pose@${MP_VER}/${f}`;
+}
+function loadScript(src) {
+  return new Promise((resolve, reject) => { const s = document.createElement("script"); s.src = src; s.onload = resolve; s.onerror = () => reject(new Error("Couldn't load the 3D body model. Check the connection and try again.")); document.head.appendChild(s) });
+}
+let poseP = null;
+function loadPose3d() {
+  if (!poseP) poseP = (async () => {
+    if (!window.Pose) await loadScript(mpUrl("pose.js"));
+    const pose = new window.Pose({ locateFile: (f) => mpUrl(f) });
+    pose.setOptions({ modelComplexity: 1, smoothLandmarks: false, enableSegmentation: false, minDetectionConfidence: 0.3, minTrackingConfidence: 0.3 });
+    let last = null; pose.onResults((r) => { last = r });
+    await pose.initialize();
+    return { async run(img) { last = null; await pose.send({ image: img }); return last }, reset() { try { pose.reset() } catch (e) {} } };
+  })().catch((e) => { poseP = null; throw new Error(/connection/.test(e && e.message) ? e.message : "The 3D body model couldn't start in this browser view. Try the Mound Visit website in Safari or Chrome.") });
+  return poseP;
+}
+const crop3 = document.createElement("canvas"); crop3.width = crop3.height = 384; const c3ctx = crop3.getContext("2d");
+async function build3d(c, onProgress) {
+  const FPS = fpsOf(c), K = c.sm, T = K.length, E = c.events;
+  const i0 = Math.max(0, E.lift - Math.round(0.5 * FPS)), i1 = Math.min(T - 1, E.fin + Math.round(0.4 * FPS));
+  const box = (i) => { let x0 = 1e9, y0 = 1e9, x1 = -1e9, y1 = -1e9; for (const p of K[i]) { x0 = Math.min(x0, p[0]); x1 = Math.max(x1, p[0]); y0 = Math.min(y0, p[1]); y1 = Math.max(y1, p[1]) } return { cx: (x0 + x1) / 2, cy: (y0 + y1) / 2, size: Math.max(x1 - x0, y1 - y0) } };
+  let size = 0; for (let i = i0; i <= i1; i++) size = Math.max(size, box(i).size);
+  size = Math.max(size * 1.45, c.torso * 3);
+  const pose = await loadPose3d(); pose.reset();
+  const raw = [];
+  try {
+    await setVideo(c, avid);
+    for (let i = i0; i <= i1; i++) {
+      await seek(c.fs0 + i / FPS, avid);
+      if (avid.src !== c.url) throw new Error("Building the 3D view was interrupted. Tap 3D again.");
+      const b = box(i), k = 384 / size, x0 = b.cx - size / 2, y0 = b.cy - size / 2;
+      c3ctx.fillStyle = "#000"; c3ctx.fillRect(0, 0, 384, 384);
+      const ix0 = Math.max(0, x0), iy0 = Math.max(0, y0), ix1 = Math.min(c.W, x0 + size), iy1 = Math.min(c.H, y0 + size);
+      if (ix1 > ix0 && iy1 > iy0) c3ctx.drawImage(avid, ix0, iy0, ix1 - ix0, iy1 - iy0, (ix0 - x0) * k, (iy0 - y0) * k, (ix1 - ix0) * k, (iy1 - iy0) * k);
+      const r = await pose.run(crop3), w = r && r.poseWorldLandmarks;
+      raw.push(w && w.length === 33 ? w.map((p) => [p.x, p.y, p.z]) : null);
+      if (onProgress) onProgress(i - i0 + 1, i1 - i0 + 1);
+    }
+  } finally { releaseVid(avid) }
+  const n = raw.length, good = raw.filter(Boolean).length;
+  if (good < n * 0.6) throw new Error("The 3D model couldn't follow the player in enough frames of this clip. A closer, steadier clip usually works.");
+  // fill frames the model missed, then smooth each coordinate over a few frames
+  const filled = raw.map((f, j) => {
+    if (f) return f;
+    let a = j - 1; while (a >= 0 && !raw[a]) a--; let b = j + 1; while (b < n && !raw[b]) b++;
+    if (a < 0) return raw[b]; if (b >= n) return raw[a];
+    const t = (j - a) / (b - a); return raw[a].map((p, q) => p.map((v, d) => v + (raw[b][q][d] - v) * t));
+  });
+  const rad = Math.max(1, Math.round(FPS / 30)), sig = rad * 1.1, wts = [];
+  for (let d = -2 * rad; d <= 2 * rad; d++) wts.push(Math.exp(-(d * d) / (2 * sig * sig)));
+  const fr = filled.map((f, j) => f.map((p, q) => p.map((_, d) => {
+    let t = 0, ws = 0; for (let e = -2 * rad; e <= 2 * rad; e++) { const jj = j + e; if (jj < 0 || jj >= n) continue; const w = wts[e + 2 * rad]; t += filled[jj][q][d] * w; ws += w }
+    return Math.round(t / ws * 1000) / 1000;
+  })));
+  // sideways and up/down travel from the 2D track, scaled from pixels to meters by the torso
+  const hipPx = (i) => mid(K[i][11], K[i][12]), shPx = (i) => mid(K[i][5], K[i][6]);
+  const ratios = [];
+  for (let j = 0; j < n; j++) {
+    const f = fr[j], i = i0 + j;
+    const l3 = Math.hypot(...[0, 1, 2].map((d) => (f[11][d] + f[12][d]) / 2 - (f[23][d] + f[24][d]) / 2)), l2 = dist(shPx(i), hipPx(i));
+    if (l2 > 1) ratios.push(l3 / l2);
+  }
+  const mpp = median(ratios) || 0, ref = hipPx(Math.min(i1, Math.max(i0, E.fs)));
+  const tr = fr.map((_, j) => { const h = hipPx(i0 + j); return [Math.round((h[0] - ref[0]) * mpp * 1000) / 1000, Math.round((h[1] - ref[1]) * mpp * 1000) / 1000] });
+  c.p3 = { i0, fr, tr };
+}
+/* geometry: forward = toward the plate (pitch) or pitcher (swing), from the back ankle to the front ankle at foot strike/plant */
+function p3Geo(c) {
+  const P = c.p3, n = P.fr.length, lead = (c.useHand || "R") === "R" ? "l" : "r", back = lead === "l" ? "r" : "l";
+  const at = (j, q) => { const f = P.fr[Math.max(0, Math.min(n - 1, j))], t = P.tr[Math.max(0, Math.min(n - 1, j))]; return [f[q][0] + t[0], f[q][1] + t[1], f[q][2]] };
+  const jf = Math.max(0, Math.min(n - 1, c.events.fs - P.i0));
+  const fa = at(jf, M3[lead + "An"]), ba = at(jf, M3[back + "An"]);
+  let dx = fa[0] - ba[0], dz = fa[2] - ba[2], L = Math.hypot(dx, dz);
+  if (L < 0.05) { dx = 1; dz = 0; L = 1 }
+  dx /= L; dz /= L;
+  const hipO = (() => { const a = at(jf, 23), b = at(jf, 24); return [(a[0] + b[0]) / 2, (a[2] + b[2]) / 2] })();
+  const lows = []; for (let j = 0; j < n; j++) lows.push(Math.max(...[27, 28, 29, 30, 31, 32].map((q) => at(j, q)[1])));
+  const floor = pct(lows, 0.6);
+  // display coordinates: X forward, Y up, Z the player's right (a right-handed frame)
+  const D = (p) => { const x = p[0] - hipO[0], z = p[2] - hipO[1]; return [x * dx + z * dz, floor - p[1], x * dz - z * dx] };
+  const frame = (j) => { const f = P.fr[Math.max(0, Math.min(n - 1, j))], t = P.tr[Math.max(0, Math.min(n - 1, j))]; return f.map((p) => D([p[0] + t[0], p[1] + t[1], p[2]])) };
+  return { n, frame, lead, back, camYaw: Math.atan2(-dz, dx) };
+}
+state.cam3 = { yaw: 0, pitch: 0.18, zoom: 1, preset: "camera" };
+const V3_BONES = [[11, 12], [11, 23], [12, 24], [23, 24], [11, 13], [13, 15], [12, 14], [14, 16], [15, 19], [16, 20], [23, 25], [25, 27], [27, 29], [29, 31], [27, 31], [24, 26], [26, 28], [28, 30], [30, 32], [28, 32]];
+function v3Presets(c) {
+  const G = p3Geo(c), R = (c.useHand || "R") === "R";
+  return isSwing(c)
+    ? [["camera", "Camera", G.camYaw, 0.18], ["face", "Facing him", R ? 0 : Math.PI, 0.12], ["pitcher", "Pitcher", Math.PI / 2, 0.12], ["catcher", "Catcher", -Math.PI / 2, 0.15], ["top", "Overhead", G.camYaw, 1.45]]
+    : [["camera", "Camera", G.camYaw, 0.18], ["b3", "3B side", 0, 0.12], ["b1", "1B side", Math.PI, 0.12], ["behind", "Behind", -Math.PI / 2, 0.15], ["catcher", "Catcher", Math.PI / 2, 0.12], ["top", "Overhead", -Math.PI / 2, 1.45]];
+}
+function setPreset3(c, key) {
+  const p = v3Presets(c).find((x) => x[0] === key) || v3Presets(c)[0];
+  Object.assign(state.cam3, { preset: p[0], yaw: p[2], pitch: p[3], zoom: 1 });
+  document.querySelectorAll("#v3dPresets button").forEach((b) => b.setAttribute("aria-pressed", b.dataset.p === p[0] ? "true" : "false"));
+}
+function render3D(ctx, c, W, H, idx) {
+  const u = Math.min(W, H) / 1080, G = p3Geo(c), j = Math.max(0, Math.min(G.n - 1, idx - c.p3.i0)), f = G.frame(j);
+  const g = ctx.createLinearGradient(0, 0, 0, H); g.addColorStop(0, "#18211c"); g.addColorStop(1, "#0b0f0d"); ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
+  const cam3 = state.cam3, dist3 = 2.9 / cam3.zoom, tgt = [0, 0.8, 0];
+  const cp = Math.cos(cam3.pitch), eye = [tgt[0] + dist3 * cp * Math.sin(cam3.yaw), tgt[1] + dist3 * Math.sin(cam3.pitch), tgt[2] + dist3 * cp * Math.cos(cam3.yaw)];
+  const sub = (a, b) => [a[0] - b[0], a[1] - b[1], a[2] - b[2]], dot = (a, b) => a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
+  const cross = (a, b) => [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]], nrm = (a) => { const l = Math.hypot(...a) || 1; return a.map((v) => v / l) };
+  const fw = nrm(sub(tgt, eye)); let rt = nrm(cross(fw, [0, 1, 0])); if (!isFinite(rt[0])) rt = [1, 0, 0]; const up = cross(rt, fw);
+  const focal = 1.25 * Math.min(W, H);
+  const P = (p) => { const v = sub(p, eye), z = dot(v, fw); return z < 0.15 ? null : [W / 2 + focal * dot(v, rt) / z, H * 0.54 - focal * dot(v, up) / z, z] };
+  const seg = (a, b, col, w, alpha = 1) => { const A = P(a), B = P(b); if (!A || !B) return; ctx.globalAlpha = alpha; ctx.strokeStyle = col; ctx.lineWidth = Math.max(1, w * focal / ((A[2] + B[2]) / 2) / (focal / dist3)); ctx.beginPath(); ctx.moveTo(A[0], A[1]); ctx.lineTo(B[0], B[1]); ctx.stroke(); ctx.globalAlpha = 1 };
+  // floor grid, centered under the hips at foot strike, and the line toward the target
+  ctx.lineCap = "round";
+  for (let k = -4; k <= 4; k++) { seg([k * 0.5, 0, -2], [k * 0.5, 0, 2], "#ffffff", 1.5 * u, 0.12); seg([-2, 0, k * 0.5], [2, 0, k * 0.5], "#ffffff", 1.5 * u, 0.12) }
+  seg([-1.6, 0, 0], [2.2, 0, 0], C.target, 4 * u, 0.55);
+  const tip = P([2.2, 0, 0]); if (tip) label(ctx, isSwing(c) ? "to pitcher" : "to plate", tip[0], tip[1] - 26 * u, C.target, u, "center");
+  // shadow of the feet and hips on the floor
+  for (const [a, b] of V3_BONES) if (a >= 23) seg([f[a][0], 0.001, f[a][2]], [f[b][0], 0.001, f[b][2]], "#000000", 9 * u, 0.25);
+  // path of the throwing hand (pitch) or the hands (swing) up to now
+  const handPt = (ff) => isSwing(c) ? [(ff[15][0] + ff[16][0]) / 2, (ff[15][1] + ff[16][1]) / 2, (ff[15][2] + ff[16][2]) / 2] : ff[G.back === "r" ? 16 : 15];
+  const j0 = Math.max(0, c.events.lift - c.p3.i0);
+  for (let k = j0 + 1; k <= j; k++) seg(handPt(G.frame(k - 1)), handPt(G.frame(k)), "#ff8a5c", 5 * u, 0.25 + 0.6 * (k - j0) / Math.max(1, j - j0));
+  // body, far parts first
+  const leadIdx = new Set(G.lead === "l" ? [11, 13, 15, 19, 23, 25, 27, 29, 31] : [12, 14, 16, 20, 24, 26, 28, 30, 32]);
+  const bones = V3_BONES.map(([a, b]) => { const A = P(f[a]), B = P(f[b]); return { a, b, z: A && B ? (A[2] + B[2]) / 2 : 1e9 } }).sort((x, y) => y.z - x.z);
+  for (const bn of bones) {
+    const { a, b } = bn;
+    // hip line blue, shoulder line yellow, sides of the trunk white, front (glove/lead) limbs blue, back limbs orange
+    const col = a === 23 && b === 24 ? "#8fbaff" : a === 11 && b === 12 ? C.target : (b === 23 || b === 24) ? "#e9efe9" : leadIdx.has(b) ? C.joint : "#ff9f43";
+    const w = (a === 23 && b === 24) || (a === 11 && b === 12) ? 13 * u : (a === 11 || a === 12) && (b === 23 || b === 24) ? 10 * u : 9 * u;
+    seg(f[a], f[b], col, w);
+  }
+  const head = [(f[7][0] + f[8][0]) / 2, (f[7][1] + f[8][1]) / 2 + 0.02, (f[7][2] + f[8][2]) / 2], HP = P(head);
+  if (HP) { const r = 0.11 * focal / HP[2]; ctx.fillStyle = "#e9efe9"; ctx.beginPath(); ctx.arc(HP[0], HP[1], r, 0, 7); ctx.fill(); const nz = P(f[0]); if (nz && nz[2] < HP[2]) { ctx.fillStyle = "#0b0f0d"; ctx.beginPath(); ctx.arc(nz[0], nz[1], r * 0.22, 0, 7); ctx.fill() } }
+  // legend and the key moment, if the frame is on one
+  const name = MOMENTS[c.kind || "pitch"], FPS = fpsOf(c);
+  const mom = ["lift", "fs", "rel", "fin"].find((k) => Math.abs(idx - c.events[k]) <= Math.round(FPS / 30));
+  label(ctx, "Hips", 24 * u, 44 * u, "#8fbaff", u, "left"); label(ctx, "Shoulders", 112 * u, 44 * u, C.target, u, "left");
+  if (mom) label(ctx, name[mom].toUpperCase(), W - 24 * u, 44 * u, C.target, u, "right");
+  label(ctx, "3D estimate from one camera", W - 24 * u, H - 34 * u, "#9fb0a6", u * 0.8, "right");
+}
+
 /* ---------------- history: saved sessions on this device (IndexedDB) ----------------
    A saved clip keeps the body tracking, the key moments as adjusted, the settings and a summary of the checks.
    When reopened, the checks are recomputed from the tracking, so later improvements to the app apply to old sessions. */
@@ -2435,7 +2640,8 @@ function sessionRecord(c, date, keepVideo) {
     torso: c.torso, launch: c.launch ?? null, noStride: !!c.noStride, quality: c.quality || null, events: { ...c.events },
     sm: c.sm.map((f) => f.map((p) => [r1(p[0]), r1(p[1]), r2(p[2])])),
     tally: n, findings: c.findings.map((f) => ({ id: f.id, status: f.status, title: f.title, meas: f.meas, level: f.level, info: !!f.info })),
-    hasVideo: !!(keepVideo && (c.file || c.videoBlob))
+    hasVideo: !!(keepVideo && (c.file || c.videoBlob)),
+    p3: c.p3 || null
   };
 }
 async function saveClips(clips, date, keepVideo, st) {
@@ -2532,7 +2738,7 @@ async function openSessions(ids) {
       let blob = null; if (r.hasVideo) { try { const v = await dbGet("videos", id); blob = v && v.blob } catch (e) {} }
       const c = { id: Math.random().toString(36).slice(2), name: r.name, label: r.player, kind: r.kind, fps: r.fps, W: r.W, H: r.H, fs0: r.fs0, duration: r.duration,
         t0: r.t0, t1: r.t1, hand: r.hand, view: r.view, lockedView: r.lockedView, handHint: r.handHint, handConf: r.handConf, autoHand: r.hand, autoView: r.view,
-        torso: r.torso, launch: r.launch, noStride: r.noStride, quality: r.quality, events: { ...r.events }, sm: r.sm, status: "done",
+        torso: r.torso, launch: r.launch, noStride: r.noStride, quality: r.quality, events: { ...r.events }, sm: r.sm, p3: r.p3 || null, status: "done",
         savedId: r.id, savedDate: r.date, autoLabel: false, batch: "saved-" + r.date, metaPromise: Promise.resolve() };
       if (blob) { c.videoBlob = blob; c.file = blob; c.url = URL.createObjectURL(blob) } else { c.noVideo = true; c.url = null }
       analyze(c);
@@ -2634,6 +2840,50 @@ document.addEventListener("keydown", (e) => {
   if (e.key === "ArrowLeft") { e.preventDefault(); $("stepBack").click() }
 });
 document.querySelectorAll("#tabbar button").forEach((b) => b.addEventListener("click", () => goScreen(b.dataset.m)));
+/* 3D view: button, angle presets, drag to turn, pinch or scroll to zoom */
+function syncV3d(c) {
+  if (state.v3d && !(c && c.p3)) state.v3d = false;
+  $("v3dBtn").setAttribute("aria-pressed", state.v3d ? "true" : "false");
+  $("v3dBar").hidden = !state.v3d; stage.classList.toggle("is3d", !!state.v3d);
+  if (state.v3d) {
+    $("v3dPresets").innerHTML = v3Presets(c).map(([k, l]) => `<button type="button" data-p="${k}" aria-pressed="${state.cam3.preset === k}">${l}</button>`).join("");
+    $("v3dPresets").querySelectorAll("button").forEach((b) => b.onclick = () => { setPreset3(c, b.dataset.p); renderStage() });
+  }
+}
+$("v3dBtn").onclick = async () => {
+  const c = clip(); if (!c) return;
+  if (state.v3d) { state.v3d = false; syncV3d(c); renderStage(); return }
+  if (c.p3) { state.v3d = true; setPreset3(c, "camera"); syncV3d(c); renderStage(); return }
+  if (!c.sm || !c.events) { $("stageStatus").textContent = "Analyze the clip first, then tap 3D."; return }
+  if (c.noVideo) { $("stageStatus").textContent = "This clip was saved without its video, so the 3D view can't be built for it."; return }
+  if (state.busy) { $("stageStatus").textContent = "Wait for the current analysis or export to finish, then tap 3D."; return }
+  stopPlay(); state.busy = true; $("v3dBtn").disabled = true; $("analyzeBtn").disabled = true;
+  const prog = $("progress"), pt = $("progText"), pb = $("progBar");
+  prog.hidden = false; pt.textContent = "Loading the 3D body model (first time only)…"; pb.style.width = "0%";
+  try {
+    await build3d(c, (i, n) => { pt.textContent = `Building 3D view: frame ${i} of ${n}`; pb.style.width = (i / n * 100) + "%" });
+    analyze(c);
+    if (clip() === c && state.view === "clip") { state.v3d = true; setPreset3(c, "camera"); syncV3d(c); renderReport(); await showFrame(c.fs0 + c.events.fs / fpsOf(c)); if (isMob() && state.m !== "video") setMode("video") }
+    $("stageStatus").textContent = "";
+  } catch (e) { $("stageStatus").textContent = e.message || String(e) }
+  finally { prog.hidden = true; state.busy = false; $("v3dBtn").disabled = false; $("analyzeBtn").disabled = !!(clip() && clip().noVideo) }
+};
+{
+  const ptrs = new Map(); let pinch0 = 0, zoom0 = 1;
+  stage.addEventListener("pointerdown", (e) => { if (!state.v3d || state.tapping) return; ptrs.set(e.pointerId, [e.clientX, e.clientY]); try { stage.setPointerCapture(e.pointerId) } catch (er) {}
+    if (ptrs.size === 2) { const [a, b] = [...ptrs.values()]; pinch0 = Math.hypot(a[0] - b[0], a[1] - b[1]); zoom0 = state.cam3.zoom } });
+  stage.addEventListener("pointermove", (e) => {
+    if (!state.v3d || !ptrs.has(e.pointerId)) return;
+    const prev = ptrs.get(e.pointerId); ptrs.set(e.pointerId, [e.clientX, e.clientY]);
+    if (ptrs.size === 1) { state.cam3.yaw -= (e.clientX - prev[0]) * 0.01; state.cam3.pitch = Math.max(-0.05, Math.min(1.5, state.cam3.pitch + (e.clientY - prev[1]) * 0.008)) }
+    else if (ptrs.size === 2 && pinch0) { const [a, b] = [...ptrs.values()]; state.cam3.zoom = Math.max(0.5, Math.min(3, zoom0 * Math.hypot(a[0] - b[0], a[1] - b[1]) / pinch0)) }
+    state.cam3.preset = ""; document.querySelectorAll("#v3dPresets button").forEach((b) => b.setAttribute("aria-pressed", "false"));
+    if (!state.playing) renderStage();
+  });
+  const up = (e) => { ptrs.delete(e.pointerId); if (ptrs.size < 2) pinch0 = 0 };
+  stage.addEventListener("pointerup", up); stage.addEventListener("pointercancel", up);
+  stage.addEventListener("wheel", (e) => { if (!state.v3d) return; e.preventDefault(); state.cam3.zoom = Math.max(0.5, Math.min(3, state.cam3.zoom * Math.exp(-e.deltaY * 0.0015))); if (!state.playing) renderStage() }, { passive: false });
+}
 $("histOpenBtn").onclick = () => selectHistory(); $("emptyHistBtn").onclick = () => selectHistory();
 $("backupBtn").onclick = () => downloadBackup();
 $("histCloseBtn").onclick = () => { if (state.clips.length) selectClip(Math.min(state.active, state.clips.length - 1)); else { state.view = "clip"; renderTabs(); setMode("home") } };
@@ -2642,7 +2892,7 @@ if (isMob()) $("setDetails").open = false;
 renderTabs(); setMode("home");
 // warm the model in the background once the page is idle
 setTimeout(() => { loadModel().catch(() => {}) }, 1500);
-window.__moundcheck = { state, analyze, detectEvents, planText, groupPlanText, combine, groups, selectAll, exportClips, downloadPlanPdf, planModelGroup, selectClip, selectHistory };
+window.__moundcheck = { state, analyze, detectEvents, planText, groupPlanText, combine, groups, selectAll, exportClips, downloadPlanPdf, planModelGroup, selectClip, selectHistory, build3d, p3Geo };
 })();
 </script>
 
