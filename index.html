@@ -2754,7 +2754,16 @@ async function openSessions(ids) {
       const existing = state.clips.findIndex((c) => c.savedId === id);
       if (existing >= 0) { if (first < 0) first = existing; continue }
       const r = await dbGet("sessions", id); if (!r) continue;
-      let blob = null; if (r.hasVideo) { try { const v = await dbGet("videos", id); blob = v && v.blob } catch (e) {} }
+      let blob = null;
+      if (r.hasVideo) {
+        try {
+          const v = await dbGet("videos", id); blob = v && v.blob;
+          if (!blob && v && v.handle) { // a video in the players folder: ask to read it again if the browser forgot
+            if ((await v.handle.queryPermission({ mode: "read" })) !== "granted") await v.handle.requestPermission({ mode: "read" });
+            blob = await v.handle.getFile();
+          }
+        } catch (e) { blob = null }
+      }
       const c = { id: Math.random().toString(36).slice(2), name: r.name, label: r.player, kind: r.kind, fps: r.fps, W: r.W, H: r.H, fs0: r.fs0, duration: r.duration,
         t0: r.t0, t1: r.t1, hand: r.hand, view: r.view, lockedView: r.lockedView, handHint: r.handHint, handConf: r.handConf, autoHand: r.hand, autoView: r.view,
         torso: r.torso, launch: r.launch, noStride: r.noStride, quality: r.quality, events: { ...r.events }, sm: r.sm, p3: r.p3 || null, status: "done",
@@ -2867,6 +2876,9 @@ async function syncRun(B, players, opts, say, log) {
         }
         say(`${tag}: saving results…`);
         await saveClips([c], date, false, quiet); // also kept in History on this device
+        if (v.ref && v.ref.kind === "file") { // History remembers where the video is, so reopening shows it
+          try { await dbPut("videos", { id: c.savedId, handle: v.ref, type: v.mime || "" }); const sr = await dbGet("sessions", c.savedId); if (sr) await dbPut("sessions", { ...sr, hasVideo: true, linked: true }) } catch (e) {}
+        }
         const rec = sessionRecord(c, date, false);
         // written last: this file is what marks the video as done, so a failure above means it's retried next time
         await B.write(p.ref, [SYNC_RESULTS], `${v.base} - report.json`, new Blob([JSON.stringify({ app: "Mound Visit", kind: "history-backup", v: 1, exported: new Date().toISOString(), source: [...v.trail, v.name].join("/"), sessions: [rec] })], { type: "application/json" }));
@@ -2876,7 +2888,6 @@ async function syncRun(B, players, opts, say, log) {
         log(`${p.name} · ${v.name}: skipped, ${e.message || e}`, "err");
         if (c && c.status !== "done") { const i = state.clips.indexOf(c); if (i >= 0) state.clips.splice(i, 1) }
       } finally {
-        if (c) { if (c.url) URL.revokeObjectURL(c.url); c.url = null; c.file = null; c.noVideo = true } // the video stays in its folder; free the memory
         renderTabs();
       }
     }
@@ -2912,7 +2923,8 @@ async function renderSync() {
     box.innerHTML = h + `<p class="note">${window.top !== window ? "Analyzing a whole folder works on the Mound Visit website, not inside this preview." : "To analyze a whole folder of player videos, open Mound Visit in Chrome or Edge on a computer. Safari and phones can't open folders."}</p>`;
     return;
   }
-  const root = await folderRoot();
+  // only the folder's name is needed to draw this; the folder itself is reopened when a button is pressed
+  const root = SY.root || (lsGet("mv.rootName") ? { name: lsGet("mv.rootName") } : null);
   if (SY.note) h += `<p class="status">${esc(SY.note)}</p>`;
   if (!root) {
     box.innerHTML = h + `<p class="note">Pick the folder on this computer that holds one folder per player. Mound Visit analyzes the videos it hasn't seen yet and saves the results into each player's folder.</p>
@@ -2942,7 +2954,7 @@ function wireSync() {
   on("syPick", async () => {
     try {
       const h = await window.showDirectoryPicker({ id: "moundvisit", mode: "readwrite" });
-      SY.root = h; await kvPut("localRoot", h); SY.players = null; SY.log = []; SY.note = ""; renderSync();
+      SY.root = h; await kvPut("localRoot", h); lsSet("mv.rootName", h.name); SY.players = null; SY.log = []; SY.note = ""; renderSync();
     } catch (e) { if (e && e.name !== "AbortError") { SY.note = "Couldn't open that folder: " + (e.message || e); renderSync() } }
   });
   on("syStop", () => { syncStop = true; SY.status = "Stopping after this video…"; const s = $("syStatus"); if (s) s.textContent = SY.status });
