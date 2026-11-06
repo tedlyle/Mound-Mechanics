@@ -171,6 +171,20 @@ details.clipSettings[open] > summary::after { content: "–" }
 .v3dPresets button { border: 1px solid var(--line); background: var(--surface); color: var(--ink); border-radius: 999px; padding: 6px 12px; font: 600 .82rem var(--f-body); cursor: pointer; min-height: 34px }
 .v3dPresets button[aria-pressed="true"] { background: var(--ink); color: var(--bg); border-color: var(--ink) }
 #stage.is3d { cursor: grab; touch-action: none }
+/* player folder sync */
+.syncCard .note.small { font-size: .82rem }
+.syRoot { display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap; margin: 6px 0 10px }
+.syOpts { display: grid; gap: 8px; margin-bottom: 10px }
+.syOpts select { min-height: 40px; font: inherit; color: var(--ink); background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 6px 10px; margin-left: 8px }
+.syTable { margin: 6px 0 4px; border: 1px solid var(--line); border-radius: 12px; overflow: hidden }
+.crumbs { display: flex; flex-wrap: wrap; gap: 4px; align-items: center; margin: 8px 0; color: var(--muted) }
+.crumb { border: 0; background: none; color: var(--accent); font: 600 .9rem var(--f-body); cursor: pointer; padding: 4px 2px }
+.syList { display: grid; gap: 6px; max-height: 320px; overflow: auto }
+.syFolder { text-align: left; border: 1px solid var(--line); background: var(--surface); color: var(--ink); border-radius: 10px; padding: 10px 12px; font: 600 .95rem var(--f-body); cursor: pointer; min-height: 44px }
+.syFolder::before { content: "📁 "; }
+.syLog { margin: 10px 0 0; padding: 0 0 0 18px; display: grid; gap: 3px; font-size: .85rem }
+.syLog .err { color: var(--fix) }
+.syLog .ok { color: var(--ink) }
 /* history + save */
 .savePanel { margin-top: 16px; border-top: 1px solid var(--line); padding-top: 12px; display: grid; gap: 8px }
 .saveRow { display: flex; gap: 10px; align-items: end; flex-wrap: wrap }
@@ -413,6 +427,7 @@ nav.clips { display: flex; gap: 8px; flex-wrap: wrap; align-items: center }
   <section id="combined" hidden aria-label="Combined report for all clips"></section>
 
   <section id="history" hidden aria-label="Saved history">
+    <div class="card syncCard" id="syncCard"></div>
     <div class="card">
       <div class="reportHead"><h2>History</h2><span class="note" id="histUsage" style="margin:0"></span><button class="btn deskOnly" id="histCloseBtn" type="button">Close</button></div>
       <p class="note" style="margin-top:6px">Saved on this device only. On iPhone, add Mound Visit to your Home Screen so Safari doesn't clear it, and download a backup now and then.</p>
@@ -2245,9 +2260,10 @@ function drawSummaryCard(ctx, W, H, title, sub, itemsIn, keepIn) {
 }
 const safeName = (t) => (t || "pitch").replace(/[^\w\- ]+/g, "").trim().replace(/\s+/g, "_") || "pitch";
 /* clips: analyzed clips to render. single: the clip when exporting one; g: the group for a combined export */
-async function exportClips(clips, single, g, stEl, btnEl) {
+async function exportClips(clips, single, g, stEl, btnEl, sink) {
+  // sink: the folder sync passes one to receive the finished file; it already holds state.busy
   const st = stEl || $("exportStatus"), btn = btnEl || $("exportBtn");
-  if (state.busy) { st.textContent = "Wait for the current analysis or export to finish."; return }
+  if (!sink && state.busy) { st.textContent = "Wait for the current analysis or export to finish."; return }
   if (clips.some((c) => c.noVideo)) { clips = clips.filter((c) => !c.noVideo); if (!clips.length) { st.textContent = "This clip was saved without its video, so it can't be exported. The report, PDF and drill plan still work."; return } }
   if (!clips.length) { st.textContent = "Analyze at least one clip first."; return }
   stopPlay();
@@ -2257,8 +2273,8 @@ async function exportClips(clips, single, g, stEl, btnEl) {
   else { const portrait = clips.filter((c) => c.H >= c.W).length >= clips.length / 2; W = portrait ? 1080 : 1920; H = portrait ? 1920 : 1080 }
   const bitrate = single ? 8_000_000 : 5_000_000;
   const codec = await pickCodec(W, H, bitrate);
-  if (!codec || !window.Mp4Muxer) { st.textContent = "This browser can't encode video. Use a current version of Chrome, Edge or Safari."; return }
-  state.busy = true; btn.disabled = true; st.textContent = "Rendering…";
+  if (!codec || !window.Mp4Muxer) { if (sink) throw new Error("this browser can't make video files; turn off the annotated video option"); st.textContent = "This browser can't encode video. Use a current version of Chrome, Edge or Safari."; return }
+  if (!sink) state.busy = true; if (btn) btn.disabled = true; st.textContent = "Rendering…";
   await fontsReady();
   const cv = document.createElement("canvas"); cv.width = W; cv.height = H; const ctx = cv.getContext("2d");
   const muxer = new Mp4Muxer.Muxer({ target: new Mp4Muxer.ArrayBufferTarget(), video: { codec: codec.mux, width: W, height: H, frameRate: OUT_FPS }, fastStart: "in-memory" });
@@ -2312,12 +2328,13 @@ async function exportClips(clips, single, g, stEl, btnEl) {
     await enc.flush(); muxer.finalize();
     const blob = new Blob([muxer.target.buffer], { type: "video/mp4" });
     st.textContent = `Rendered ${(blob.size / 1e6).toFixed(1)} MB. Saving…`;
-    await saveBlob(blob, filename, st);
+    if (sink) await sink(blob, filename); else await saveBlob(blob, filename, st);
   } catch (e) {
+    if (sink) throw e;
     st.textContent = "Export stopped: " + (e && e.message ? e.message : e);
   } finally {
     try { enc.close() } catch (e) {}
-    btn.disabled = false; state.busy = false;
+    if (btn) btn.disabled = false; if (!sink) state.busy = false;
     releaseVid(avid);
   }
 }
@@ -2384,8 +2401,9 @@ function modelText(m) {
 const planText = (c) => modelText(planModelClip(c));
 const groupPlanText = (g) => modelText(planModelGroup(g));
 const pdfSafe = (t) => String(t).replace(/≈/g, "~").replace(/→/g, "to").replace(/✓/g, "").replace(/[“”]/g, '"').replace(/[‘’]/g, "'").replace(/[^\x00-\xFF·—–]/g, "");
-async function downloadPlanPdf(m, st) {
+async function downloadPlanPdf(m, st, sink) {
   const J = window.jspdf && window.jspdf.jsPDF;
+  if (!J && sink) throw new Error("the PDF library didn't load");
   if (!J) { st.textContent = "The PDF library didn't load. Check your connection and reload the page."; return }
   const doc = new J({ unit: "pt", format: "letter" });
   const PW = 612, PH = 792, M = 54, CW = PW - M * 2;
@@ -2445,6 +2463,7 @@ async function downloadPlanPdf(m, st) {
   const pages = doc.getNumberOfPages();
   for (let i = 1; i <= pages; i++) { doc.setPage(i); doc.setFont("helvetica", "normal"); doc.setFontSize(8); doc.setTextColor(...COL.muted); doc.text(pdfSafe(`${m.name} · Mound Visit · page ${i} of ${pages} · Automated 2D estimate from phone video; confirm with your own eye.`), M, PH - 28) }
   const blob = doc.output("blob");
+  if (sink) return sink(blob);
   await saveBlob(blob, `${safeName(m.name)}_practice_plan.pdf`, st);
 }
 function copyText(text, st, ta) {
@@ -2608,8 +2627,8 @@ let dbPromise = null;
 function openDb() {
   if (!dbPromise) dbPromise = new Promise((resolve) => {
     try {
-      const rq = indexedDB.open("moundcheck", 1);
-      rq.onupgradeneeded = () => { const d = rq.result; if (!d.objectStoreNames.contains("sessions")) d.createObjectStore("sessions", { keyPath: "id" }); if (!d.objectStoreNames.contains("videos")) d.createObjectStore("videos", { keyPath: "id" }) };
+      const rq = indexedDB.open("moundcheck", 2);
+      rq.onupgradeneeded = () => { const d = rq.result; for (const n of ["sessions", "videos", "kv"]) if (!d.objectStoreNames.contains(n)) d.createObjectStore(n, { keyPath: "id" }) };
       rq.onsuccess = () => resolve(rq.result); rq.onerror = () => resolve(null); rq.onblocked = () => resolve(null);
     } catch (e) { resolve(null) }
   });
@@ -2683,7 +2702,7 @@ function wireSavePanel(panel, getClips) {
     await saveClips(clips, date, vid ? vid.checked : false, st);
   };
 }
-function selectHistory() { stopPlay(); state.view = "history"; renderTabs(); renderHistory(); setMode("history"); window.scrollTo({ top: 0 }) }
+function selectHistory() { stopPlay(); state.view = "history"; renderTabs(); renderHistory(); renderSync(); setMode("history"); window.scrollTo({ top: 0 }) }
 async function renderHistory() {
   const body = $("histBody");
   let recs;
@@ -2770,6 +2789,184 @@ async function restoreBackup(file) {
   } catch (e) { st.textContent = "Restore failed: " + (e.message || e) }
 }
 
+/* ---------------- player folders on this computer ----------------
+   Coach picks the folder that holds one folder per player (Chrome or Edge on a computer can open a folder with
+   read and write permission). New videos in each player's folder are analyzed and the results are written to a
+   "Mound Visit results" folder inside that player's folder. The videos never leave the computer. */
+const SYNC_RESULTS = "Mound Visit results";
+const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+const lsGet = (k) => { try { return localStorage.getItem(k) } catch (e) { return null } };
+const lsSet = (k, v) => { try { v == null ? localStorage.removeItem(k) : localStorage.setItem(k, v) } catch (e) {} };
+const localPossible = () => typeof window.showDirectoryPicker === "function" && window.top === window;
+const LOCAL = {
+  kind: "local",
+  async children(h) {
+    const out = [];
+    for await (const [name, e] of h.entries()) {
+      if (name.startsWith(".") || name.startsWith("~$")) continue;
+      if (e.kind === "directory") out.push({ name, isFolder: true, ref: e });
+      else { const f = await e.getFile(); out.push({ name, isFolder: false, ref: e, size: f.size, mime: f.type, date: new Date(f.lastModified).toISOString(), file: f }) }
+    }
+    return out;
+  },
+  async blob(item) { return item.file || item.ref.getFile() },
+  async write(dir, sub, name, blob) {
+    let d = dir; for (const s of sub) d = await d.getDirectoryHandle(s, { create: true });
+    const w = await (await d.getFileHandle(name, { create: true })).createWritable(); await w.write(blob); await w.close();
+  }
+};
+/* engine */
+const isVid = (it) => !it.isFolder && (/^video\//.test(it.mime || "") || /\.(mov|mp4|m4v|webm)$/i.test(it.name));
+const kindFrom = (s) => /pitch|mound|bullpen/i.test(s) ? "pitch" : /hit|bat|swing|cage|\btee\b/i.test(s) ? "swing" : null;
+const isoDay = (d) => { const t = new Date(d || Date.now()); return isNaN(t) ? todayIso() : new Date(t.getTime() - t.getTimezoneOffset() * 60000).toISOString().slice(0, 10) };
+async function syncScan(B, root, defKind, step) {
+  const players = [];
+  const top = (await B.children(root)).filter((x) => x.isFolder && x.name !== SYNC_RESULTS).sort((a, b) => a.name.localeCompare(b.name));
+  for (const p of top) {
+    step(`Looking in ${p.name}…`);
+    const vids = []; let done = new Set();
+    const walk = async (ref, trail, depth) => {
+      for (const it of await B.children(ref)) {
+        if (it.isFolder) {
+          if (it.name === SYNC_RESULTS) { if (depth === 0) done = new Set((await B.children(it.ref)).filter((x) => !x.isFolder).map((x) => x.name)) }
+          else if (depth < 2) await walk(it.ref, [...trail, it.name], depth + 1);
+        } else if (isVid(it)) vids.push({ ...it, trail, kind: kindFrom([...trail, it.name].join("/")) || defKind });
+      }
+    };
+    await walk(p.ref, [], 0);
+    for (const v of vids) { v.base = [...v.trail, v.name.replace(/\.[^.]+$/, "")].join(" - "); v.done = done.has(`${v.base} - report.json`) }
+    vids.sort((a, b) => String(a.date).localeCompare(String(b.date)) || a.name.localeCompare(b.name));
+    players.push({ name: p.name, ref: p.ref, vids });
+  }
+  return players;
+}
+let syncStop = false;
+async function syncRun(B, players, opts, say, log) {
+  const todo = players.flatMap((p) => p.vids.filter((v) => !v.done).map((v) => ({ p, v })));
+  const quiet = document.createElement("p"), made = [];
+  let lock = null; try { lock = await navigator.wakeLock.request("screen") } catch (e) {} // keeps a phone awake while it works
+  state.busy = true; syncStop = false;
+  try {
+    for (let n = 0; n < todo.length && !syncStop; n++) {
+      const { p, v } = todo[n], tag = `${n + 1} of ${todo.length} · ${p.name} · ${v.name}`;
+      let c = null;
+      try {
+        say(`${tag}: downloading…`);
+        const blob = await B.blob(v);
+        const file = new File([blob], v.name, { type: blob.type || v.mime || "video/mp4" });
+        c = { id: Math.random().toString(36).slice(2), file, name: v.base, url: URL.createObjectURL(file), hand: "auto", view: "auto", t0: 0, t1: 0,
+          status: "new", label: p.name, batch: "sync", autoLabel: false, kind: v.kind };
+        state.clips.push(c); renderTabs();
+        try { await ensureMeta(c) } catch (e) { throw new Error("this browser can't open the video" + (/\.mov$/i.test(v.name) ? ". iPhone videos (HEVC) open in Safari or on a Mac; Chrome on Windows may need the HEVC Video Extension" : "")) }
+        if (c.duration > 45) throw new Error(`it's ${Math.round(c.duration)} s long. Trim it to one pitch or swing and it'll be picked up next time`);
+        await analyzeClip(c, (i, k) => say(`${tag}: tracking frame ${i} of ${k}`));
+        const date = isoDay(v.date);
+        if (opts.video) {
+          say(`${tag}: drawing the annotated video…`);
+          await exportClips([c], c, null, quiet, null, async (b) => { say(`${tag}: saving the annotated video (${(b.size / 1e6).toFixed(0)} MB)…`); await B.write(p.ref, [SYNC_RESULTS], `${v.base} - annotated.mp4`, b) });
+        }
+        say(`${tag}: saving results…`);
+        await saveClips([c], date, false, quiet); // also kept in History on this device
+        const rec = sessionRecord(c, date, false);
+        // written last: this file is what marks the video as done, so a failure above means it's retried next time
+        await B.write(p.ref, [SYNC_RESULTS], `${v.base} - report.json`, new Blob([JSON.stringify({ app: "Mound Visit", kind: "history-backup", v: 1, exported: new Date().toISOString(), source: [...v.trail, v.name].join("/"), sessions: [rec] })], { type: "application/json" }));
+        made.push({ p, c, date }); v.done = true;
+        log(`${p.name} · ${v.name}: done (${c.findings.filter((f) => f.status === "fix").length} to fix, ${c.findings.filter((f) => f.status === "watch").length} to watch)`, "ok");
+      } catch (e) {
+        log(`${p.name} · ${v.name}: skipped, ${e.message || e}`, "err");
+        if (c && c.status !== "done") { const i = state.clips.indexOf(c); if (i >= 0) state.clips.splice(i, 1) }
+      } finally {
+        if (c) { if (c.url) URL.revokeObjectURL(c.url); c.url = null; c.file = null; c.noVideo = true } // the video stays in its folder; free the memory
+        renderTabs();
+      }
+    }
+    // one practice plan per player, kind and day, covering every angle from that day
+    const plans = new Map();
+    for (const m of made) { const k = `${m.p.name}|${m.c.kind}|${m.date}`; if (!plans.has(k)) plans.set(k, { p: m.p, kind: m.c.kind, date: m.date, clips: [] }); plans.get(k).clips.push(m.c) }
+    for (const g of plans.values()) {
+      say(`Writing the practice plan for ${g.p.name}…`);
+      const grp = { key: `${g.kind}|${g.p.name.toLowerCase()}`, kind: g.kind, player: g.p.name, name: `${g.p.name} · ${KIND_WORD[g.kind]}`, clips: g.clips };
+      try { await downloadPlanPdf(planModelGroup(grp), quiet, (b) => B.write(g.p.ref, [SYNC_RESULTS], `Practice plan ${g.date} ${KIND_WORD[g.kind]}.pdf`, b)); log(`${g.p.name}: ${KIND_WORD[g.kind].toLowerCase()} practice plan for ${niceDate(g.date)} saved`, "ok") }
+      catch (e) { log(`${g.p.name}: practice plan not saved, ${e.message || e}`, "err") }
+    }
+    return { done: made.length, total: todo.length, stopped: syncStop };
+  } finally { state.busy = false; try { lock && lock.release() } catch (e) {} }
+}
+/* folder card on the History screen */
+const SY = { root: null, players: null, log: [], running: false, note: "" };
+const kvGet = (k) => dbGet("kv", k).then((r) => r && r.v).catch(() => null);
+const kvPut = (k, v) => dbPut("kv", { id: k, v }).catch(() => {});
+async function folderRoot() { if (!SY.root) { const h = await kvGet("localRoot"); if (h) SY.root = h } return SY.root }
+async function folderAccess(ask) {
+  const h = await folderRoot(); if (!h) return null;
+  try {
+    if ((await h.queryPermission({ mode: "readwrite" })) === "granted") return h;
+    if (ask && (await h.requestPermission({ mode: "readwrite" })) === "granted") return h;
+  } catch (e) {}
+  return null;
+}
+async function renderSync() {
+  const box = $("syncCard"); if (!box) return;
+  let h = `<div class="reportHead"><h2>Player folders</h2></div>`;
+  if (!localPossible()) {
+    box.innerHTML = h + `<p class="note">${window.top !== window ? "Analyzing a whole folder works on the Mound Visit website, not inside this preview." : "To analyze a whole folder of player videos, open Mound Visit in Chrome or Edge on a computer. Safari and phones can't open folders."}</p>`;
+    return;
+  }
+  const root = await folderRoot();
+  if (SY.note) h += `<p class="status">${esc(SY.note)}</p>`;
+  if (!root) {
+    box.innerHTML = h + `<p class="note">Pick the folder on this computer that holds one folder per player. Mound Visit analyzes the videos it hasn't seen yet and saves the results into each player's folder.</p>
+      <div class="actions histActions"><button class="btn primary" type="button" id="syPick">Choose the players folder</button></div>`;
+    wireSync(); return;
+  }
+  const defKind = lsGet("mv.defKind") || "pitch", vid = lsGet("mv.syncVid") !== "0";
+  h += `<div class="syRoot"><span>Players folder: <b>${esc(root.name)}</b></span>${SY.running ? "" : `<button class="btn" type="button" id="syPick">Change</button>`}</div>
+    <div class="syOpts">
+      <label class="field">Videos not in a Pitching or Hitting folder are<select id="syKind"${SY.running ? " disabled" : ""}><option value="pitch"${defKind === "pitch" ? " selected" : ""}>Pitching</option><option value="swing"${defKind === "swing" ? " selected" : ""}>Hitting</option></select></label>
+      <label class="toggle"><input type="checkbox" id="syVid"${vid ? " checked" : ""}${SY.running ? " disabled" : ""}> Also save the annotated video (slower, bigger files)</label>
+    </div>`;
+  if (SY.running) h += `<p class="status" id="syStatus">${esc(SY.status || "Working…")}</p><div class="actions histActions"><button class="btn" type="button" id="syStop">Stop after this video</button></div>`;
+  else if (SY.players) {
+    const nNew = SY.players.reduce((t, p) => t + p.vids.filter((v) => !v.done).length, 0);
+    h += SY.players.length ? `<table class="trend syTable"><thead><tr><th>Player</th><th>Videos</th><th>New</th></tr></thead><tbody>${SY.players.map((p) => { const nw = p.vids.filter((v) => !v.done); return `<tr><td>${esc(p.name)}</td><td>${p.vids.length}</td><td>${nw.length ? `<b>${nw.length}</b> <span class="na">${["pitch", "swing"].filter((k) => nw.some((v) => v.kind === k)).map((k) => KIND_WORD[k].toLowerCase()).join(", ")}</span>` : `<span class="na">·</span>`}</td></tr>` }).join("")}</tbody></table>` : `<p class="note">No player folders found inside “${esc(root.name)}”. It should hold one folder per player.</p>`;
+    h += `<div class="actions histActions">${nNew ? `<button class="btn primary" type="button" id="syRun">Analyze and save ${nNew} new video${nNew === 1 ? "" : "s"}</button>` : ""}<button class="btn" type="button" id="syScan">Check again</button></div>
+      ${nNew ? `<p class="note small">Keep this tab open while it works. Roughly ${Math.max(1, Math.round(nNew * (vid ? 1.5 : 0.8)))} min on a recent computer.</p>` : SY.players.length ? `<p class="note">Everything is up to date.</p>` : ""}`;
+  } else h += `<div class="actions histActions"><button class="btn primary" type="button" id="syScan">Check for new videos</button></div>`;
+  if (SY.log.length) h += `<ul class="syLog">${SY.log.slice(-40).map((l) => `<li class="${l.k}">${esc(l.t)}</li>`).join("")}</ul>`;
+  box.innerHTML = h; wireSync();
+}
+function wireSync() {
+  const on = (id, fn) => { const b = $(id); if (b) b.onclick = fn };
+  const sel = $("syKind"); if (sel) sel.onchange = () => { lsSet("mv.defKind", sel.value); if (SY.players) { SY.players = null; renderSync() } };
+  const cb = $("syVid"); if (cb) cb.onchange = () => lsSet("mv.syncVid", cb.checked ? "1" : "0");
+  on("syPick", async () => {
+    try {
+      const h = await window.showDirectoryPicker({ id: "moundvisit", mode: "readwrite" });
+      SY.root = h; await kvPut("localRoot", h); SY.players = null; SY.log = []; SY.note = ""; renderSync();
+    } catch (e) { if (e && e.name !== "AbortError") { SY.note = "Couldn't open that folder: " + (e.message || e); renderSync() } }
+  });
+  on("syStop", () => { syncStop = true; SY.status = "Stopping after this video…"; const s = $("syStatus"); if (s) s.textContent = SY.status });
+  on("syScan", async () => {
+    const root = await folderAccess(true);
+    if (!root) { SY.note = "Mound Visit needs permission to read and save in that folder. Tap the button again and choose Allow."; renderSync(); return }
+    const btn = $("syScan"); btn.disabled = true;
+    try { SY.players = await syncScan(LOCAL, root, lsGet("mv.defKind") || "pitch", (t) => { btn.textContent = t }); SY.note = "" }
+    catch (e) { SY.note = "Couldn't read the folder: " + (e.message || e) }
+    renderSync();
+  });
+  on("syRun", async () => {
+    if (state.busy) { SY.note = "Wait for the current analysis or export to finish."; renderSync(); return }
+    const root = await folderAccess(true); if (!root) { SY.note = "Mound Visit needs permission to save in that folder."; renderSync(); return }
+    SY.running = true; SY.status = "Starting…"; SY.log = []; SY.note = ""; renderSync();
+    const say = (t) => { SY.status = t; const s = $("syStatus"); if (s) s.textContent = t };
+    const log = (t, k) => { SY.log.push({ t, k }); const ul = $("syncCard").querySelector(".syLog"); if (ul) { const li = document.createElement("li"); li.className = k; li.textContent = t; ul.appendChild(li) } else renderSync() };
+    try {
+      const r = await syncRun(LOCAL, SY.players, { video: lsGet("mv.syncVid") !== "0" }, say, log);
+      log(r.stopped ? `Stopped. ${r.done} of ${r.total} videos done; the rest will be picked up next time.` : r.done ? `Finished: ${r.done} of ${r.total} videos analyzed. Results are in each player's “${SYNC_RESULTS}” folder.` : `Finished, but none of the ${r.total} videos could be analyzed. See the notes above.`, r.done ? "ok" : "err");
+    } catch (e) { log("Stopped: " + (e.message || e), "err") }
+    finally { SY.running = false; renderSync(); if (state.view === "history") renderHistory() }
+  });
+}
 /* ---------------- events ---------------- */
 $("fileIn").addEventListener("change", (e) => { addFiles([...e.target.files], "pitch"); e.target.value = "" });
 $("fileInBat").addEventListener("change", (e) => { addFiles([...e.target.files], "swing"); e.target.value = "" });
@@ -2892,7 +3089,7 @@ if (isMob()) $("setDetails").open = false;
 renderTabs(); setMode("home");
 // warm the model in the background once the page is idle
 setTimeout(() => { loadModel().catch(() => {}) }, 1500);
-window.__moundcheck = { state, analyze, detectEvents, planText, groupPlanText, combine, groups, selectAll, exportClips, downloadPlanPdf, planModelGroup, selectClip, selectHistory, build3d, p3Geo };
+window.__moundcheck = { state, analyze, detectEvents, planText, groupPlanText, combine, groups, selectAll, exportClips, downloadPlanPdf, planModelGroup, selectClip, selectHistory, build3d, p3Geo, syncScan, syncRun, LOCAL, renderSync, SY };
 })();
 </script>
 
